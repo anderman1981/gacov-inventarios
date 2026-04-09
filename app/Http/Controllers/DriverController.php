@@ -1,0 +1,364 @@
+<?php
+declare(strict_types=1);
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreStockingRequest;
+use App\Http\Requests\StoreSaleRequest;
+use App\Models\Machine;
+use App\Models\MachineSale;
+use App\Models\MachineSaleItem;
+use App\Models\MachineStockingItem;
+use App\Models\MachineStockingRecord;
+use App\Models\Product;
+use App\Models\Route;
+use App\Models\Stock;
+use App\Models\StockMovement;
+use App\Models\Warehouse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
+use Illuminate\View\View;
+
+final class DriverController extends Controller
+{
+    public function dashboard(Request $request): View
+    {
+        $user  = auth()->user();
+        $route = $this->resolveActiveRoute($request);
+        $availableRoutes = $this->availableRoutes();
+
+        $machines = collect();
+        $vehicleWarehouse = null;
+
+        if ($route) {
+            $machines = Machine::with(['warehouse.stocks.product'])
+                ->where('route_id', $route->id)
+                ->where('is_active', true)
+                ->get()
+                ->map(function (Machine $machine): Machine {
+                    $machine->total_stock = $machine->warehouse
+                        ? $machine->warehouse->stocks->sum('quantity')
+                        : 0;
+                    return $machine;
+                });
+
+            $vehicleWarehouse = Warehouse::where('route_id', $route->id)
+                ->where('type', 'vehiculo')
+                ->first();
+        }
+
+        $todayStockings = MachineStockingRecord::where('performed_by', $user->id)
+            ->whereDate('created_at', today())
+            ->count();
+
+        $todaySales = MachineSale::where('registered_by', $user->id)
+            ->whereDate('sale_date', today())
+            ->count();
+
+        // Aproximación del total vendido hoy: suma de quantity_sold * unit_price
+        $todaySalesAmount = MachineSaleItem::whereHas('sale', function ($q) use ($user) {
+            $q->where('registered_by', $user->id)->whereDate('sale_date', today());
+        })->selectRaw('SUM(quantity_sold * unit_price) as total')->value('total') ?? 0;
+
+        return view('driver.dashboard', compact(
+            'user', 'route', 'machines', 'vehicleWarehouse',
+            'todayStockings', 'todaySales', 'todaySalesAmount', 'availableRoutes'
+        ));
+    }
+
+    public function stocking(Request $request): View
+    {
+        $route = $this->resolveActiveRoute($request);
+        $availableRoutes = $this->availableRoutes();
+
+        $machines = Machine::where('route_id', $route?->id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $vehicleWarehouse = Warehouse::where('route_id', $route?->id)
+            ->where('type', 'vehiculo')
+            ->first();
+
+        $products = Product::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function (Product $product) use ($vehicleWarehouse): Product {
+                $product->vehicle_stock = $vehicleWarehouse
+                    ? (int) (Stock::where('warehouse_id', $vehicleWarehouse->id)
+                        ->where('product_id', $product->id)
+                        ->value('quantity') ?? 0)
+                    : 0;
+                return $product;
+            });
+
+        return view('driver.stocking.create', compact('machines', 'products', 'vehicleWarehouse', 'route', 'availableRoutes'));
+    }
+
+    public function storeStocking(StoreStockingRequest $request): RedirectResponse
+    {
+        $user = auth()->user();
+        $route = $this->resolveRouteFromInput($request->integer('route_id'));
+
+        if (! $route instanceof Route) {
+            return back()->withInput()->with('error', 'Debe seleccionar una ruta válida para registrar el surtido.');
+        }
+
+        $machine = Machine::where('id', $request->integer('machine_id'))
+            ->where('route_id', $route->id)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $vehicleWarehouse = Warehouse::where('route_id', $route->id)
+            ->where('type', 'vehiculo')
+            ->firstOrFail();
+
+        $machineWarehouse = $machine->warehouse;
+
+        if (! $machineWarehouse) {
+            return back()->withInput()->with('error', 'La máquina no tiene bodega asignada.');
+        }
+
+        $items = collect($request->validated('items', []))
+            ->filter(fn(array $item): bool => ($item['quantity'] ?? 0) > 0);
+
+        if ($items->isEmpty()) {
+            return back()->withInput()->with('error', 'Debe ingresar al menos un producto con cantidad mayor a cero.');
+        }
+
+        foreach ($items as $productId => $item) {
+            $vehicleStock = (int) (Stock::where('warehouse_id', $vehicleWarehouse->id)
+                ->where('product_id', $productId)
+                ->value('quantity') ?? 0);
+
+            $requested = (int) $item['quantity'];
+
+            if ($vehicleStock < $requested) {
+                $product = Product::find($productId);
+                return back()->withInput()
+                    ->with('error', "Stock insuficiente en vehículo para «{$product?->name}». Disponible: {$vehicleStock}, solicitado: {$requested}.");
+            }
+        }
+
+        DB::transaction(function () use ($user, $machine, $vehicleWarehouse, $machineWarehouse, $items, $request, $route): void {
+            $code = 'SURT-' . strtoupper(substr(uniqid(), -6));
+
+            $record = MachineStockingRecord::create([
+                'code'                => $code,
+                'machine_id'          => $machine->id,
+                'route_id'            => $route?->id,
+                'vehicle_warehouse_id' => $vehicleWarehouse->id,
+                'performed_by'        => $user->id,
+                'status'              => 'completado',
+                'notes'               => $request->input('notes'),
+                'was_offline'         => false,
+                'started_at'          => now(),
+                'completed_at'        => now(),
+            ]);
+
+            foreach ($items as $productId => $item) {
+                $qty = (int) $item['quantity'];
+
+                MachineStockingItem::create([
+                    'stocking_record_id' => $record->id,
+                    'product_id'         => (int) $productId,
+                    'quantity_loaded'    => $qty,
+                ]);
+
+                // Decrementar vehículo
+                $vs = Stock::firstOrNew(['warehouse_id' => $vehicleWarehouse->id, 'product_id' => (int) $productId]);
+                $vs->quantity = ($vs->quantity ?? 0) - $qty;
+                $vs->save();
+
+                // Incrementar máquina
+                $ms = Stock::firstOrNew(['warehouse_id' => $machineWarehouse->id, 'product_id' => (int) $productId]);
+                $ms->quantity = ($ms->quantity ?? 0) + $qty;
+                $ms->save();
+
+                // Movimiento
+                StockMovement::create([
+                    'product_id'              => (int) $productId,
+                    'origin_warehouse_id'     => $vehicleWarehouse->id,
+                    'destination_warehouse_id' => $machineWarehouse->id,
+                    'movement_type'           => 'surtido_maquina',
+                    'quantity'                => $qty,
+                    'reference_code'          => $code,
+                    'notes'                   => "Surtido máquina {$machine->code}",
+                    'performed_by'            => $user->id,
+                ]);
+            }
+        });
+
+        return redirect()->route('driver.dashboard', ['route_id' => $route->id])
+            ->with('success', "Surtido registrado para la máquina {$machine->name}.");
+    }
+
+    public function sales(Request $request): View
+    {
+        $route = $this->resolveActiveRoute($request);
+        $availableRoutes = $this->availableRoutes();
+
+        $machines = Machine::where('route_id', $route?->id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $products = Product::where('is_active', true)->orderBy('name')->get();
+
+        return view('driver.sales.create', compact('machines', 'products', 'route', 'availableRoutes'));
+    }
+
+    public function storeSale(StoreSaleRequest $request): RedirectResponse
+    {
+        $user = auth()->user();
+        $route = $this->resolveRouteFromInput($request->integer('route_id'));
+
+        if (! $route instanceof Route) {
+            return back()->withInput()->with('error', 'Debe seleccionar una ruta válida para registrar la venta.');
+        }
+
+        $machine = Machine::where('id', $request->integer('machine_id'))
+            ->where('route_id', $route->id)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $machineWarehouse = $machine->warehouse;
+
+        if (! $machineWarehouse) {
+            return back()->withInput()->with('error', 'La máquina no tiene bodega asignada.');
+        }
+
+        $items = collect($request->validated('items', []))
+            ->filter(fn(array $item): bool => ($item['quantity'] ?? 0) > 0);
+
+        if ($items->isEmpty()) {
+            return back()->withInput()->with('error', 'Debe ingresar al menos un producto con cantidad mayor a cero.');
+        }
+
+        foreach ($items as $productId => $item) {
+            $machineStock = (int) (Stock::where('warehouse_id', $machineWarehouse->id)
+                ->where('product_id', $productId)
+                ->value('quantity') ?? 0);
+
+            $requested = (int) $item['quantity'];
+
+            if ($machineStock < $requested) {
+                $product = Product::find($productId);
+                return back()->withInput()
+                    ->with('error', "Stock insuficiente en máquina para «{$product?->name}». Disponible: {$machineStock}, vendido: {$requested}.");
+            }
+        }
+
+        DB::transaction(function () use ($user, $machine, $machineWarehouse, $items, $request): void {
+            $code = 'VENTA-' . strtoupper(substr(uniqid(), -6));
+
+            $sale = MachineSale::create([
+                'code'          => $code,
+                'machine_id'    => $machine->id,
+                'registered_by' => $user->id,
+                'status'        => 'completado',
+                'sale_date'     => today(),
+                'notes'         => $request->input('notes'),
+                'was_offline'   => false,
+            ]);
+
+            foreach ($items as $productId => $item) {
+                $qty       = (int) $item['quantity'];
+                $unitPrice = (float) ($item['unit_price'] ?? 0);
+
+                MachineSaleItem::create([
+                    'machine_sale_id' => $sale->id,
+                    'product_id'      => (int) $productId,
+                    'quantity_sold'   => $qty,
+                    'unit_price'      => $unitPrice,
+                ]);
+
+                $stock = Stock::firstOrNew(['warehouse_id' => $machineWarehouse->id, 'product_id' => (int) $productId]);
+                $stock->quantity = ($stock->quantity ?? 0) - $qty;
+                $stock->save();
+
+                StockMovement::create([
+                    'product_id'          => (int) $productId,
+                    'origin_warehouse_id' => $machineWarehouse->id,
+                    'movement_type'       => 'venta_maquina',
+                    'quantity'            => $qty,
+                    'unit_cost'           => $unitPrice,
+                    'reference_code'      => $code,
+                    'notes'               => "Venta en máquina {$machine->code}",
+                    'performed_by'        => $user->id,
+                ]);
+            }
+        });
+
+        return redirect()->route('driver.dashboard', ['route_id' => $route->id])
+            ->with('success', "Venta registrada para la máquina {$machine->name}.");
+    }
+
+    public function vehicleInventory(Request $request): View
+    {
+        $route = $this->resolveActiveRoute($request);
+        $availableRoutes = $this->availableRoutes();
+
+        $vehicleWarehouse = Warehouse::where('route_id', $route?->id)
+            ->where('type', 'vehiculo')
+            ->first();
+
+        $stocks = collect();
+
+        if ($vehicleWarehouse) {
+            $stocks = Stock::with('product')
+                ->where('warehouse_id', $vehicleWarehouse->id)
+                ->where('quantity', '>', 0)
+                ->get()
+                ->sortBy('product.name');
+        }
+
+        return view('driver.vehicle-inventory', compact('vehicleWarehouse', 'stocks', 'route', 'availableRoutes'));
+    }
+
+    private function resolveActiveRoute(Request $request): ?Route
+    {
+        return $this->resolveRouteFromInput($request->integer('route_id'));
+    }
+
+    private function resolveRouteFromInput(?int $routeId): ?Route
+    {
+        $user = auth()->user();
+
+        if ($routeId && $this->canSelectRoute()) {
+            return Route::query()
+                ->whereKey($routeId)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        return $user?->route;
+    }
+
+    /**
+     * @return Collection<int, Route>
+     */
+    private function availableRoutes(): Collection
+    {
+        if (! $this->canSelectRoute()) {
+            $userRoute = auth()->user()?->route;
+
+            return $userRoute instanceof Route
+                ? collect([$userRoute])
+                : collect();
+        }
+
+        return Route::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function canSelectRoute(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user?->hasRole('super_admin') || $user?->can('machines.view'));
+    }
+}
