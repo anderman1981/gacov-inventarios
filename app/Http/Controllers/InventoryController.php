@@ -7,11 +7,12 @@ use App\Exports\InitialInventoryTemplateExport;
 use App\Http\Requests\ImportInitialInventoryRequest;
 use App\Models\ExcelImport;
 use App\Http\Requests\AdjustStockRequest;
+use App\Models\Machine;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockMovement;
-use App\Models\Warehouse;
 use App\Models\Route;
+use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,36 +29,47 @@ final class InventoryController extends Controller
 
         $mainWarehouse = Warehouse::where('type', 'bodega')->first();
 
-        $stocks = collect();
+        $stocks = null;
         $totalUnits = 0;
         $totalSkus  = 0;
+        $visibleUnits = 0;
+        $visibleLowStockCount = 0;
+        $perPage = $this->resolvePerPage($request, 25);
+        $perPageOptions = [10, 25, 50, 100];
+        $search = trim((string) $request->input('search'));
+        $category = trim((string) $request->input('category'));
 
         if ($mainWarehouse) {
-            $query = Stock::with('product')
-                ->where('warehouse_id', $mainWarehouse->id);
+            $baseQuery = Stock::query()
+                ->select('stock.*')
+                ->with('product')
+                ->join('products', 'products.id', '=', 'stock.product_id')
+                ->where('stock.warehouse_id', $mainWarehouse->id)
+                ->when($search !== '', function ($query) use ($search): void {
+                    $query->where(function ($nestedQuery) use ($search): void {
+                        $nestedQuery->where('products.name', 'like', "%{$search}%")
+                            ->orWhere('products.code', 'like', "%{$search}%");
+                    });
+                })
+                ->when($category !== '', fn ($query) => $query->where('products.category', $category));
 
-            if ($search = $request->input('search')) {
-                $query->whereHas('product', function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
-                });
-            }
+            $stocks = (clone $baseQuery)
+                ->orderBy('products.name')
+                ->paginate($perPage)
+                ->withQueryString();
 
-            if ($category = $request->input('category')) {
-                $query->whereHas('product', fn($q) => $q->where('category', $category));
-            }
+            $visibleCollection = $stocks->getCollection();
 
-            $stocks = Stock::with('product')
-                ->where('warehouse_id', $mainWarehouse->id)
-                ->when($search ?? null, fn($q) => $q->whereHas('product', function ($q2) use ($search) {
-                    $q2->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%");
-                }))
-                ->when($category ?? null, fn($q) => $q->whereHas('product', fn($q2) => $q2->where('category', $category)))
-                ->get()
-                ->sortBy('product.name');
+            $totalSkus  = (clone $baseQuery)->where('stock.quantity', '>', 0)->count();
+            $totalUnits = (int) (clone $baseQuery)->sum('stock.quantity');
+            $visibleUnits = (int) $visibleCollection->sum('quantity');
+            $visibleLowStockCount = $visibleCollection
+                ->filter(function (Stock $stock): bool {
+                    $threshold = max(1, (int) ($stock->min_quantity ?? $stock->product->min_stock_alert ?? 10));
 
-            $totalSkus  = $stocks->where('quantity', '>', 0)->count();
-            $totalUnits = (int) $stocks->sum('quantity');
+                    return (int) $stock->quantity <= $threshold;
+                })
+                ->count();
         }
 
         $categories = [
@@ -69,7 +81,15 @@ final class InventoryController extends Controller
         ];
 
         return view('inventory.warehouse', compact(
-            'mainWarehouse', 'stocks', 'totalSkus', 'totalUnits', 'categories'
+            'mainWarehouse',
+            'stocks',
+            'totalSkus',
+            'totalUnits',
+            'visibleUnits',
+            'visibleLowStockCount',
+            'categories',
+            'perPage',
+            'perPageOptions',
         ));
     }
 
@@ -156,7 +176,9 @@ final class InventoryController extends Controller
             $query->whereDate('created_at', '<=', $to);
         }
 
-        $movements = $query->paginate(20)->withQueryString();
+        $perPage = $this->resolvePerPage($request, 25);
+        $perPageOptions = [10, 25, 50, 100];
+        $movements = $query->paginate($perPage)->withQueryString();
 
         $movementTypes = [
             'carga_inicial'    => 'Carga inicial',
@@ -169,17 +191,35 @@ final class InventoryController extends Controller
             'exportado_wo'     => 'Exportado WO',
         ];
 
-        return view('inventory.movements', compact('movements', 'movementTypes'));
+        return view('inventory.movements', compact('movements', 'movementTypes', 'perPage', 'perPageOptions'));
     }
 
-    public function vehicleStocks(): View
+    public function vehicleStocks(Request $request): View
     {
         abort_unless(auth()->user()?->can('inventory.view'), 403);
 
-        $routes = Route::with(['driver'])
-            ->where('is_active', true)
-            ->get()
-            ->map(function (Route $route): Route {
+        $perPage = $this->resolvePerPage($request, 12);
+        $perPageOptions = [6, 12, 24, 48];
+        $search = trim((string) $request->input('search'));
+
+        $routeQuery = Route::query()
+            ->where('is_active', true);
+
+        if ($search !== '') {
+            $routeQuery->where(function ($query) use ($search): void {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        $routeIdsSubquery = (clone $routeQuery)->select('routes.id');
+
+        $routes = $routeQuery
+            ->with(['driver'])
+            ->orderBy('name')
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(function (Route $route): Route {
                 $vehicleWarehouse = Warehouse::where('route_id', $route->id)
                     ->where('type', 'vehiculo')
                     ->first();
@@ -196,7 +236,104 @@ final class InventoryController extends Controller
                 return $route;
             });
 
-        return view('inventory.vehicle-stocks', compact('routes'));
+        $totalRoutes = (clone $routeQuery)->count();
+        $configuredVehicles = Warehouse::query()
+            ->where('type', 'vehiculo')
+            ->whereIn('route_id', $routeIdsSubquery)
+            ->count();
+        $totalUnits = (int) Stock::query()
+            ->join('warehouses', 'warehouses.id', '=', 'stock.warehouse_id')
+            ->where('warehouses.type', 'vehiculo')
+            ->whereIn('warehouses.route_id', $routeIdsSubquery)
+            ->sum('stock.quantity');
+        $visibleUnits = (int) $routes->getCollection()
+            ->sum(fn (Route $route): int => (int) $route->vehicle_stocks->sum('quantity'));
+
+        return view('inventory.vehicle-stocks', compact(
+            'routes',
+            'totalRoutes',
+            'configuredVehicles',
+            'totalUnits',
+            'visibleUnits',
+            'perPage',
+            'perPageOptions',
+        ));
+    }
+
+    public function machineStocks(Request $request): View
+    {
+        abort_unless(auth()->user()?->can('inventory.view'), 403);
+
+        $perPage = $this->resolvePerPage($request, 12);
+        $perPageOptions = [6, 12, 24, 48];
+        $machineQuery = Machine::with('route')
+            ->where('is_active', true);
+
+        if ($search = trim((string) $request->input('search'))) {
+            $machineQuery->where(function ($query) use ($search): void {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($routeId = $request->integer('route_id')) {
+            $machineQuery->where('route_id', $routeId);
+        }
+
+        $machineIdsSubquery = (clone $machineQuery)->select('machines.id');
+
+        $machines = $machineQuery
+            ->orderBy('name')
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(function (Machine $machine): Machine {
+                $machineWarehouse = Warehouse::where('machine_id', $machine->id)
+                    ->where('type', 'maquina')
+                    ->first();
+
+                $machine->machine_warehouse = $machineWarehouse;
+                $machine->machine_stocks = $machineWarehouse
+                    ? Stock::with('product')
+                        ->where('warehouse_id', $machineWarehouse->id)
+                        ->where('quantity', '>', 0)
+                        ->get()
+                        ->sortBy('product.name')
+                        ->values()
+                    : collect();
+
+                $machine->stock_units = (int) $machine->machine_stocks->sum('quantity');
+                $machine->stock_skus = $machine->machine_stocks->count();
+                $machine->has_initial_inventory = $machine->machine_warehouse !== null;
+
+                return $machine;
+            });
+
+        $routes = Route::where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $totalMachines = (clone $machineQuery)->count();
+        $configuredWarehouses = Warehouse::query()
+            ->where('type', 'maquina')
+            ->whereIn('machine_id', $machineIdsSubquery)
+            ->count();
+        $totalUnits = (int) Stock::query()
+            ->join('warehouses', 'warehouses.id', '=', 'stock.warehouse_id')
+            ->where('warehouses.type', 'maquina')
+            ->whereIn('warehouses.machine_id', $machineIdsSubquery)
+            ->sum('stock.quantity');
+        $visibleUnits = (int) $machines->getCollection()->sum('stock_units');
+
+        return view('inventory.machine-stocks', compact(
+            'machines',
+            'routes',
+            'totalMachines',
+            'configuredWarehouses',
+            'totalUnits',
+            'visibleUnits',
+            'perPage',
+            'perPageOptions',
+        ));
     }
 
     public function importForm(): View
@@ -252,5 +389,16 @@ final class InventoryController extends Controller
         return redirect()
             ->route('inventory.import.form')
             ->with($importLog->error_rows > 0 ? 'error' : 'success', $message);
+    }
+
+    private function resolvePerPage(Request $request, int $default = 25): int
+    {
+        $value = $request->integer('per_page', $default);
+
+        if (! in_array($value, [6, 10, 12, 24, 25, 48, 50, 100], true)) {
+            return $default;
+        }
+
+        return $value;
     }
 }

@@ -48,14 +48,24 @@
             {{-- Inventario --}}
             <div class="nav-section">Inventario</div>
 
-            <a href="{{ route('inventory.warehouse') }}" class="nav-item {{ str_starts_with($route,'inventory') ? 'active' : '' }}">
+            <a href="{{ route('products.index') }}" class="nav-item {{ str_starts_with($route,'products') ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/></svg>
+                <span>Productos</span>
+            </a>
+
+            <a href="{{ route('inventory.warehouse') }}" class="nav-item {{ $route === 'inventory.warehouse' || str_starts_with($route, 'inventory.adjust') || str_starts_with($route, 'inventory.import') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 8a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
                 <span>Bodega Principal</span>
             </a>
 
-            <a href="{{ route('products.index') }}" class="nav-item {{ str_starts_with($route,'products') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/></svg>
-                <span>Productos</span>
+            <a href="{{ route('inventory.vehicles') }}" class="nav-item {{ $route === 'inventory.vehicles' ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 11a1 1 0 011-1h9l2.447-2.04A1 1 0 0117 8.728V14a2 2 0 01-2 2h-.382a2.5 2.5 0 01-4.236 0H8.618a2.5 2.5 0 01-4.236 0H4a2 2 0 01-2-2v-3zm3.5 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm6 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM5 6a1 1 0 011-1h6a1 1 0 110 2H6A1 1 0 015 6z"/></svg>
+                <span>Vehículos</span>
+            </a>
+
+            <a href="{{ route('inventory.machines') }}" class="nav-item {{ $route === 'inventory.machines' ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h2a2 2 0 012 2v2h1V4a2 2 0 114 0v2h1a2 2 0 012 2v4a2 2 0 01-2 2h-1v2a2 2 0 11-4 0v-2h-1v2a2 2 0 11-4 0v-2H6a2 2 0 01-2-2V8a2 2 0 012-2h1V4zm2 2h8V4h-2v2a1 1 0 11-2 0V4H8v2a1 1 0 11-2 0V4H6v2zm0 2v4h8V8H6z" clip-rule="evenodd"/></svg>
+                <span>Máquinas</span>
             </a>
 
             {{-- Rutas y Máquinas --}}

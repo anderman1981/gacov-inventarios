@@ -828,7 +828,15 @@ PROMPT;
                 return 'Gemini está con alta demanda en este momento. Intenta de nuevo en unos minutos.';
             }
 
+            if ($status === 403 || Str::contains($normalizedMessage, ['denied access', 'contact support'])) {
+                return 'Gemini rechazó este proyecto por permisos o acceso denegado. Revisa la configuración del proyecto en Google AI Studio o cambia de proveedor.';
+            }
+
             if ($status === 429) {
+                if (Str::contains($normalizedMessage, ['quota', 'billing', 'exceeded your current quota'])) {
+                    return 'Gemini no tiene cuota disponible en este proyecto. Revisa facturación, límites y credenciales antes de volver a intentar.';
+                }
+
                 return 'Gemini rechazó la solicitud por límite temporal de uso. Espera un momento y vuelve a intentar.';
             }
         }

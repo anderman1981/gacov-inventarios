@@ -3,41 +3,44 @@
 @section('title', 'Importar carga inicial')
 
 @section('content')
-<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap">
-    <div>
-        <h1 class="page-title">Importar carga inicial</h1>
-        <p class="page-subtitle">
-            Plantilla y carga masiva para la primera toma de inventario de la bodega principal, enfocada en cantidades por producto.
-        </p>
+<div class="inventory-shell inventory-shell--light">
+@include('inventory.partials.section-nav')
+
+<section class="inventory-hero">
+    <div class="inventory-hero__grid">
+        <div>
+            <span class="inventory-hero__eyebrow">Carga masiva</span>
+            <h1 class="inventory-hero__title">Importar carga inicial</h1>
+            <p class="inventory-hero__subtitle">Plantilla y carga masiva para la primera toma de inventario de la bodega principal, enfocada solo en cantidades por producto.</p>
+            @if($mainWarehouse)
+            <div class="inventory-hero__badges">
+                <span class="badge badge-info">{{ $mainWarehouse->name }}</span>
+                <span class="badge badge-neutral">Bodega principal</span>
+            </div>
+            @endif
+        </div>
+        <div class="inventory-hero__actions">
+            <a href="{{ route('inventory.import.template') }}" class="btn btn-primary">Descargar template</a>
+            <a href="{{ route('inventory.warehouse') }}" class="btn" style="background:#eaf1f7;color:#0f172a">Volver a bodega</a>
+        </div>
     </div>
-    <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
-        <a href="{{ route('inventory.import.template') }}" class="btn btn-primary" style="width:auto">
-            Descargar template
-        </a>
-        <a href="{{ route('inventory.warehouse') }}" class="btn" style="width:auto;background:var(--gacov-bg-elevated);color:var(--gacov-text-primary)">
-            Volver a bodega
-        </a>
-    </div>
-</div>
+</section>
 
 @if(!$mainWarehouse)
 <div class="alert alert-error">
     No existe una bodega principal activa para cargar inventario.
 </div>
 @else
-<div style="display:grid;grid-template-columns:1.1fr .9fr;gap:var(--space-6);align-items:start">
-    <section class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Subir archivo</span>
+<div class="inventory-card-grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));">
+    <section class="inventory-location-card">
+        <div class="inventory-location-card__head">
+            <div>
+                <div class="inventory-location-card__title">Subir archivo</div>
+                <p class="inventory-location-card__subtitle">Archivo oficial para la primera carga del inventario.</p>
+            </div>
             <span class="badge badge-info">{{ $mainWarehouse->name }}</span>
         </div>
-        <div class="panel-body">
-            <p style="margin-bottom:var(--space-4);color:var(--gacov-text-secondary)">
-                Usa la plantilla oficial y llena una fila por producto. El sistema busca por <strong>código / SKU</strong> o por
-                <strong>código WorldOffice</strong> y deja la cantidad exacta cargada en la bodega principal. En esta fase no se cargan
-                precios ni valores.
-            </p>
-
+        <div class="inventory-location-card__body">
             <form method="POST" action="{{ route('inventory.import.store') }}" enctype="multipart/form-data">
                 @csrf
                 <div class="form-group">
@@ -46,79 +49,81 @@
                     @error('inventory_file')<span class="form-error">{{ $message }}</span>@enderror
                 </div>
 
-                <div class="panel" style="margin:var(--space-5) 0 0;background:var(--gacov-bg-elevated)">
-                    <div class="panel-body">
-                        <div style="font-weight:600;margin-bottom:var(--space-2)">Formato esperado</div>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Columna</th>
-                                    <th>Obligatoria</th>
-                                    <th>Ejemplo</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><code>codigo_producto</code></td>
-                                    <td>Sí</td>
-                                    <td><code>124</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>cantidad_inicial</code></td>
-                                    <td>Sí</td>
-                                    <td><code>36</code></td>
-                                </tr>
-                                <tr>
-                                    <td><code>observaciones</code></td>
-                                    <td>No</td>
-                                    <td><code>Carga inicial abril</code></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="inventory-panel-note" style="border:1px solid #dbe5ef;border-radius:18px;margin-top:var(--space-4);">
+                    Usa el archivo oficial y llena una fila por producto. El sistema toma <strong>codigo del producto</strong> y <strong>cantidad inicial</strong>. No se importan precios ni valores.
                 </div>
 
-                <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6)">
+                <div style="margin-top:var(--space-5)">
                     <button type="submit" class="btn btn-primary" style="width:auto">Procesar importación</button>
                 </div>
             </form>
+
+            <div class="table-scroll" style="margin-top:var(--space-5)">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Columna</th>
+                            <th>Obligatoria</th>
+                            <th>Ejemplo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>codigo_producto</code></td>
+                            <td>Sí</td>
+                            <td><code>124</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>cantidad_inicial</code></td>
+                            <td>Sí</td>
+                            <td><code>36</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>observaciones</code></td>
+                            <td>No</td>
+                            <td><code>Carga inicial abril</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 
-    <section class="panel">
-        <div class="panel-header">
-            <span class="panel-title">Recomendaciones</span>
+    <section class="inventory-location-card">
+        <div class="inventory-location-card__head">
+            <div>
+                <div class="inventory-location-card__title">Guía rápida</div>
+                <p class="inventory-location-card__subtitle">Lo mínimo para evitar errores en la primera carga.</p>
+            </div>
         </div>
-        <div class="panel-body" style="display:grid;gap:var(--space-4);color:var(--gacov-text-secondary)">
-            <div>
-                <div style="font-weight:600;color:var(--gacov-text-primary)">1. Descarga la plantilla</div>
-                <div>Empieza siempre desde el archivo oficial para evitar columnas incorrectas.</div>
-            </div>
-            <div>
-                <div style="font-weight:600;color:var(--gacov-text-primary)">2. Usa el código visible del producto</div>
-                <div>El código debe coincidir con el SKU/código cargado en el catálogo de productos.</div>
-            </div>
-            <div>
-                <div style="font-weight:600;color:var(--gacov-text-primary)">3. La cantidad es absoluta</div>
-                <div>La importación deja el inventario final con la cantidad indicada en el archivo, no suma sobre la existente.</div>
-            </div>
-            <div>
-                <div style="font-weight:600;color:var(--gacov-text-primary)">4. Solo controla cantidades</div>
-                <div>En esta primera fase la operación se concentra en unidades por producto, no en precios, costos o valorización.</div>
-            </div>
-            <div>
-                <div style="font-weight:600;color:var(--gacov-text-primary)">5. Revisa el historial</div>
-                <div>Si una fila falla, el sistema la deja registrada y te muestra el conteo de errores.</div>
+        <div class="inventory-location-card__body">
+            <div class="inventory-meta-strip">
+                <div class="inventory-meta-card">
+                    <div class="inventory-meta-card__label">Paso 1</div>
+                    <div class="inventory-meta-card__value" style="font-size:18px">Descargar</div>
+                    <div class="inventory-table-product__meta">Empieza siempre con la plantilla oficial.</div>
+                </div>
+                <div class="inventory-meta-card">
+                    <div class="inventory-meta-card__label">Paso 2</div>
+                    <div class="inventory-meta-card__value" style="font-size:18px">Llenar</div>
+                    <div class="inventory-table-product__meta">Usa el codigo visible del producto.</div>
+                </div>
+                <div class="inventory-meta-card">
+                    <div class="inventory-meta-card__label">Paso 3</div>
+                    <div class="inventory-meta-card__value" style="font-size:18px">Cargar</div>
+                    <div class="inventory-table-product__meta">La cantidad se toma como valor final.</div>
+                </div>
             </div>
         </div>
     </section>
 </div>
 
-<section class="panel" style="margin-top:var(--space-6)">
-    <div class="panel-header">
-        <span class="panel-title">Historial reciente</span>
+<section class="panel inventory-table-panel">
+    <div class="inventory-results-bar">
+        <span>Historial reciente: <strong>{{ number_format($recentImports->count(), 0, ',', '.') }}</strong> importaciones</span>
     </div>
     @if($recentImports->isNotEmpty())
+    <div class="table-scroll">
     <table class="data-table">
         <thead>
             <tr>
@@ -146,22 +151,17 @@
                 <td style="text-align:center">{{ $import->error_rows }}</td>
                 <td>{{ $import->user?->name ?? '—' }}</td>
             </tr>
-            @if(!empty($import->error_log))
-            <tr>
-                <td colspan="7" style="background:rgba(239,68,68,.05);color:var(--gacov-text-secondary)">
-                    <strong>Detalle:</strong>
-                    {{ implode(' | ', array_slice($import->error_log, 0, 5)) }}
-                </td>
-            </tr>
-            @endif
             @endforeach
         </tbody>
     </table>
+    </div>
     @else
-    <div class="panel-body" style="color:var(--gacov-text-muted)">
-        Aún no hay importaciones registradas para carga inicial.
+    <div class="inventory-empty">
+        <p class="inventory-empty__title">Sin historial todavía</p>
+        <p>Aún no hay importaciones registradas para carga inicial.</p>
     </div>
     @endif
 </section>
 @endif
+</div>
 @endsection

@@ -15,6 +15,12 @@ final class ProductController extends Controller
     {
         abort_unless(auth()->user()?->can('products.view'), 403);
 
+        $selectedTab = in_array($request->input('status', 'active'), ['active', 'inactive'], true)
+            ? (string) $request->input('status', 'active')
+            : 'active';
+        $perPage = $this->resolvePerPage($request, 25);
+        $perPageOptions = [10, 25, 50, 100];
+
         $query = Product::query();
 
         if ($search = $request->input('search')) {
@@ -30,15 +36,19 @@ final class ProductController extends Controller
             $query->where('category', $category);
         }
 
-        $activeProducts = (clone $query)
+        $activeCount = (clone $query)
             ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
+            ->count();
 
-        $inactiveProducts = (clone $query)
+        $inactiveCount = (clone $query)
             ->where('is_active', false)
+            ->count();
+
+        $products = (clone $query)
+            ->where('is_active', $selectedTab === 'active')
             ->orderBy('name')
-            ->get();
+            ->paginate($perPage)
+            ->withQueryString();
 
         $categories = [
             'snack'            => 'Snacks',
@@ -49,10 +59,14 @@ final class ProductController extends Controller
         ];
 
         return view('products.index', [
-            'activeProducts' => $activeProducts,
-            'inactiveProducts' => $inactiveProducts,
+            'products' => $products,
+            'selectedTab' => $selectedTab,
             'categories' => $categories,
-            'totalProducts' => $activeProducts->count() + $inactiveProducts->count(),
+            'totalProducts' => $activeCount + $inactiveCount,
+            'activeCount' => $activeCount,
+            'inactiveCount' => $inactiveCount,
+            'perPage' => $perPage,
+            'perPageOptions' => $perPageOptions,
         ]);
     }
 
@@ -101,5 +115,16 @@ final class ProductController extends Controller
         $product->update(['is_active' => ! $product->is_active]);
         $estado = $product->is_active ? 'activado' : 'desactivado';
         return back()->with('success', "Producto {$estado} correctamente.");
+    }
+
+    private function resolvePerPage(Request $request, int $default = 25): int
+    {
+        $value = $request->integer('per_page', $default);
+
+        if (! in_array($value, [10, 25, 50, 100], true)) {
+            return $default;
+        }
+
+        return $value;
     }
 }

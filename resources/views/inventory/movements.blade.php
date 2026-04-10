@@ -2,21 +2,37 @@
 @section('title', 'Movimientos')
 
 @section('content')
-<div class="page-header">
-    <h1 class="page-title">Historial de movimientos</h1>
-    <p class="page-subtitle">Registro completo de entradas, salidas y traslados</p>
-</div>
+<div class="inventory-shell inventory-shell--light">
+@include('inventory.partials.section-nav')
 
-{{-- Filtros --}}
-<div class="panel" style="margin-bottom:var(--space-5)">
-    <div class="panel-body" style="padding:var(--space-4) var(--space-6)">
-        <form method="GET" action="{{ route('inventory.movements') }}" style="display:flex;gap:var(--space-4);flex-wrap:wrap;align-items:flex-end">
+<section class="inventory-hero">
+    <div class="inventory-hero__grid">
+        <div>
+            <span class="inventory-hero__eyebrow">Trazabilidad</span>
+            <h1 class="inventory-hero__title">Historial de movimientos</h1>
+            <p class="inventory-hero__subtitle">Registro consolidado de entradas, salidas, ajustes, surtidos, ventas y traslados.</p>
+            <div class="inventory-hero__badges">
+                <span class="badge badge-info">Registros: {{ number_format($movements->total(), 0, ',', '.') }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="inventory-filter-card">
+    <div class="inventory-filter-card__header">
+        <div>
+            <div class="inventory-filter-card__title">Filtrar historial</div>
+            <div class="inventory-filter-card__copy">Reduce ruido por producto, tipo de movimiento o rango de fechas.</div>
+        </div>
+    </div>
+    <div class="inventory-filter-card__body">
+        <form method="GET" action="{{ route('inventory.movements') }}" class="inventory-filter-form">
             <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0">
                 <label class="form-label">Producto</label>
                 <input type="text" name="search" class="form-input" placeholder="Nombre del producto..." value="{{ request('search') }}">
             </div>
             <div class="form-group" style="min-width:180px;margin-bottom:0">
-                <label class="form-label">Tipo de movimiento</label>
+                <label class="form-label">Tipo</label>
                 <select name="type" class="form-input">
                     <option value="">Todos</option>
                     @foreach($movementTypes as $key => $label)
@@ -32,15 +48,30 @@
                 <label class="form-label">Hasta</label>
                 <input type="date" name="to" class="form-input" value="{{ request('to') }}">
             </div>
-            <button type="submit" class="btn btn-primary" style="width:auto">Filtrar</button>
-            <a href="{{ route('inventory.movements') }}" style="padding:11px 16px;color:var(--gacov-text-muted);text-decoration:none;font-size:13px">Limpiar</a>
+            <div class="form-group" style="min-width:130px;margin-bottom:0">
+                <label class="form-label">Por página</label>
+                <select name="per_page" class="form-input">
+                    @foreach($perPageOptions as $option)
+                    <option value="{{ $option }}" {{ $perPage === $option ? 'selected' : '' }}>{{ $option }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="inventory-filter-actions">
+                <button type="submit" class="btn btn-primary" style="width:auto">Filtrar</button>
+                <a href="{{ route('inventory.movements') }}" class="inventory-filter-reset">Limpiar</a>
+            </div>
         </form>
     </div>
-</div>
+</section>
 
-{{-- Tabla --}}
-<div class="panel">
-    @if($movements->isNotEmpty())
+<section class="panel inventory-table-panel">
+    <div class="inventory-results-bar">
+        <span>Movimientos encontrados: <strong>{{ number_format($movements->total(), 0, ',', '.') }}</strong></span>
+        <span>En esta página: <strong>{{ number_format($movements->count(), 0, ',', '.') }}</strong></span>
+    </div>
+
+    @if($movements->count() > 0)
+    <div class="table-scroll">
     <table class="data-table">
         <thead>
             <tr>
@@ -48,8 +79,8 @@
                 <th>Producto</th>
                 <th>Tipo</th>
                 <th style="text-align:center">Cantidad</th>
-                <th>Bodega origen</th>
-                <th>Bodega destino</th>
+                <th>Origen</th>
+                <th>Destino</th>
                 <th>Usuario</th>
                 <th>Referencia</th>
             </tr>
@@ -57,10 +88,18 @@
         <tbody>
             @foreach($movements as $movement)
             <tr>
-                <td style="white-space:nowrap;color:var(--gacov-text-secondary);font-size:13px">
-                    {{ $movement->created_at->format('d/m/Y H:i') }}
+                <td style="white-space:nowrap;font-size:13px">
+                    <div class="inventory-table-product">
+                        <span class="inventory-table-product__name">{{ $movement->created_at->format('d/m/Y') }}</span>
+                        <span class="inventory-table-product__meta">{{ $movement->created_at->format('H:i') }}</span>
+                    </div>
                 </td>
-                <td><strong>{{ $movement->product->name ?? '—' }}</strong></td>
+                <td>
+                    <div class="inventory-table-product">
+                        <span class="inventory-table-product__name">{{ $movement->product->name ?? '—' }}</span>
+                        <span class="inventory-table-product__meta">{{ $movement->product->code ?? '—' }}</span>
+                    </div>
+                </td>
                 <td>
                     @php
                     $typeBadge = match($movement->movement_type) {
@@ -69,35 +108,39 @@
                         'traslado_salida'  => ['badge-neutral', 'Traslado salida'],
                         'traslado_entrada' => ['badge-neutral', 'Traslado entrada'],
                         'surtido_maquina'  => ['badge-success', 'Surtido máquina'],
-                        'venta_maquina'    => ['', 'Venta máquina'],
+                        'venta_maquina'    => ['badge-info', 'Venta máquina'],
                         'conteo_fisico'    => ['badge-warning', 'Conteo físico'],
                         'exportado_wo'     => ['badge-info', 'Exportado WO'],
                         default            => ['badge-neutral', $movement->movement_type],
                     };
                     @endphp
-                    @if($movement->movement_type === 'venta_maquina')
-                        <span class="badge" style="background:rgba(124,58,237,.12);color:#7C3AED">Venta máquina</span>
-                    @else
-                        <span class="badge {{ $typeBadge[0] }}">{{ $typeBadge[1] }}</span>
-                    @endif
+                    <span class="badge {{ $typeBadge[0] }}">{{ $typeBadge[1] }}</span>
                 </td>
-                <td style="text-align:center;font-weight:700">{{ number_format((float) $movement->quantity, 0, ',', '.') }}</td>
-                <td style="font-size:13px;color:var(--gacov-text-secondary)">{{ $movement->fromWarehouse->name ?? '—' }}</td>
-                <td style="font-size:13px;color:var(--gacov-text-secondary)">{{ $movement->toWarehouse->name ?? '—' }}</td>
-                <td style="font-size:13px">{{ $movement->user->name ?? '—' }}</td>
+                <td style="text-align:center"><span class="inventory-quantity is-good">{{ number_format((float) $movement->quantity, 0, ',', '.') }}</span></td>
+                <td>{{ $movement->fromWarehouse->name ?? '—' }}</td>
+                <td>{{ $movement->toWarehouse->name ?? '—' }}</td>
+                <td>{{ $movement->user->name ?? '—' }}</td>
                 <td style="font-size:12px;color:var(--gacov-text-muted);white-space:nowrap">{{ $movement->reference ?? '—' }}</td>
             </tr>
             @endforeach
         </tbody>
     </table>
-    <div style="padding:var(--space-4) var(--space-6);border-top:1px solid var(--gacov-border)">
-        {{ $movements->links() }}
     </div>
-    @else
-    <div class="panel-body" style="text-align:center;padding:var(--space-12) 0;color:var(--gacov-text-muted)">
-        <p style="font-size:15px;font-weight:500">Sin movimientos</p>
-        <p style="font-size:13px">No se encontraron movimientos con los filtros aplicados.</p>
+
+    @if($movements->hasPages())
+    <div class="inventory-pagination">
+        <div class="inventory-pagination__meta">
+            Mostrando {{ $movements->firstItem() }}-{{ $movements->lastItem() }} de {{ $movements->total() }} movimientos
+        </div>
+        <div>{{ $movements->links() }}</div>
     </div>
     @endif
+    @else
+    <div class="inventory-empty">
+        <p class="inventory-empty__title">Sin movimientos</p>
+        <p>No se encontraron movimientos con los filtros aplicados.</p>
+    </div>
+    @endif
+</section>
 </div>
 @endsection

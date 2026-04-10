@@ -56,6 +56,8 @@ final class StockingPhotoImport extends Component
 
     public bool $processing = false;
 
+    public bool $manualMode = false;
+
     public function mount(?int $routeId = null): void
     {
         $user = auth()->user();
@@ -203,6 +205,92 @@ final class StockingPhotoImport extends Component
             $this->processing = false;
             $this->processingMessage = null;
         }
+    }
+
+    public function enableManualMode(): void
+    {
+        $this->authorizeUsage();
+        $this->manualMode = true;
+        $this->lastError  = null;
+    }
+
+    public function disableManualMode(): void
+    {
+        $this->manualMode = false;
+        $this->lastError  = null;
+    }
+
+    /**
+     * Called from Alpine.js with client-side quantities.
+     *
+     * @param  array<string, int>  $quantities  normalized product-code → qty
+     */
+    public function submitManualData(string $machineKey, array $quantities): void
+    {
+        $this->authorizeUsage();
+
+        $machineKey = trim($machineKey);
+
+        if ($machineKey === '') {
+            $this->lastError = 'Selecciona una máquina antes de guardar.';
+            $this->dispatchToast('error', $this->lastError);
+            return;
+        }
+
+        $normalizedKey = $this->normalizeMachineCode($machineKey);
+        $machine       = $this->routeMachines[$normalizedKey] ?? null;
+        $machineLabel  = $machine !== null ? $machine['code'] : strtoupper($machineKey);
+
+        $rows = [];
+
+        foreach ($quantities as $productCodeKey => $rawQty) {
+            $qty = max(0, (int) $rawQty);
+
+            if ($qty === 0) {
+                continue;
+            }
+
+            $product = $this->productCatalog[(string) $productCodeKey] ?? null;
+
+            if ($product === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'code'        => $product['code'],
+                'catalogCode' => $product['code'],
+                'product'     => $product['name'],
+                'quantities'  => [$normalizedKey => $qty],
+            ];
+        }
+
+        if ($rows === []) {
+            $this->lastError = 'Ingresa al menos una cantidad mayor a cero para continuar.';
+            $this->dispatchToast('error', $this->lastError);
+            return;
+        }
+
+        $this->machineColumns = [$machineLabel];
+        $this->parsedRows     = array_map(fn (array $row): array => [
+            'cod'      => $row['code'],
+            'producto' => $row['product'],
+            'maquinas' => $row['quantities'],
+        ], $rows);
+
+        $this->summaryMessage = "Entrada manual — Máquina {$machineLabel}. "
+            . count($rows) . ' producto(s) con cantidad asignada.';
+
+        $this->dispatch(
+            'driver-stocking-photo-imported',
+            rows:              $rows,
+            machineColumns:    [$machineLabel],
+            sheetRouteName:    null,
+            sheetOperatorName: auth()->user()?->name,
+        );
+
+        $this->dispatchToast('success', "Planilla manual lista para máquina {$machineLabel}.");
+        $this->lastError  = null;
+        $this->manualMode = false;
     }
 
     public function render(): View
@@ -768,8 +856,8 @@ PROMPT;
 
         $normalizedMessage = Str::lower($message);
 
-        return in_array($status, [429, 500, 503], true)
-            || Str::contains($normalizedMessage, ['high demand', 'temporarily unavailable', 'overloaded', 'try again later']);
+        return in_array($status, [403, 404, 429, 500, 503], true)
+            || Str::contains($normalizedMessage, ['high demand', 'temporarily unavailable', 'overloaded', 'try again later', 'not found', 'model not found']);
     }
 
     private function formatProviderError(string $provider, string $message, ?int $status = null): string
@@ -777,6 +865,10 @@ PROMPT;
         $normalizedMessage = Str::lower($message);
 
         if ($provider === 'local_ocr') {
+            if ($status === 503 && Str::contains($normalizedMessage, ['ollama_model configurado', 'requiere ollama_model'])) {
+                return 'El OCR local está iniciado, pero falta configurar OLLAMA_MODEL con un modelo de vision en el servicio Python.';
+            }
+
             if ($status === 503 || Str::contains($normalizedMessage, ['ollama', 'ocr local', 'conectar'])) {
                 return 'El OCR local no está disponible. Verifica que el servicio Python y Ollama estén iniciados.';
             }
@@ -791,7 +883,15 @@ PROMPT;
                 return 'Gemini está con alta demanda en este momento. Intenta de nuevo en unos minutos.';
             }
 
+            if ($status === 403 || Str::contains($normalizedMessage, ['denied access', 'contact support'])) {
+                return 'Gemini rechazó este proyecto por permisos o acceso denegado. Revisa la configuración del proyecto en Google AI Studio o cambia de proveedor.';
+            }
+
             if ($status === 429) {
+                if (Str::contains($normalizedMessage, ['quota', 'billing', 'exceeded your current quota'])) {
+                    return 'Gemini no tiene cuota disponible en este proyecto. Revisa facturación, límites y credenciales antes de volver a intentar.';
+                }
+
                 return 'Gemini rechazó la solicitud por límite temporal de uso. Espera un momento y vuelve a intentar.';
             }
         }
