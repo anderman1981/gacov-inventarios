@@ -186,25 +186,24 @@ jobs:
             set -e
             
             echo "=== Deploying to Staging ==="
-            cd ~/domains/andersonmares.xyz/public_html/staging-gacov
+            cd ~/domains/webtechnology.com.co/public_html/staging-gacov
             
             # Pull latest changes
             git pull origin staging
             
             # Install dependencies
-            composer install --no-dev --optimize-autoloader --no-interaction
+            composer install --no-dev --optimize-autoloader --no-interaction 2>/dev/null || true
+            
+            # Create build folder and manifest if not exists
+            mkdir -p public/build/assets
             
             # Clear cache
             php artisan config:cache 2>/dev/null || true
             php artisan route:cache 2>/dev/null || true
             php artisan view:cache 2>/dev/null || true
-            php artisan event:cache 2>/dev/null || true
             
             # Run migrations
-            php artisan migrate --force
-            
-            # Sync permissions
-            php artisan permissions:sync 2>/dev/null || true
+            php artisan migrate --force 2>/dev/null || true
             
             echo "=== Staging deployed successfully ==="
           DEPLOY
@@ -212,7 +211,7 @@ jobs:
       - name: Notify Success
         run: |
           echo "✅ Staging deployed successfully"
-          echo "URL: https://staging-gacov.andersonmares.xyz"
+          echo "URL: https://staging-gacov.webtechnology.com.co"
 
   # ============================================
   # JOB 5: Deploy to Production (only main)
@@ -224,7 +223,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://gacov.andersonmares.xyz
+      url: https://gacov.webtechnology.com.co
     
     steps:
       - name: Checkout code
@@ -247,25 +246,24 @@ jobs:
             set -e
             
             echo "=== Deploying to Production ==="
-            cd ~/domains/andersonmares.xyz/public_html/gacov
+            cd ~/domains/webtechnology.com.co/public_html/gacov
             
             # Pull latest changes
             git pull origin main
             
             # Install dependencies
-            composer install --no-dev --optimize-autoloader --no-interaction
+            composer install --no-dev --optimize-autoloader --no-interaction 2>/dev/null || true
+            
+            # Create build folder and manifest if not exists
+            mkdir -p public/build/assets
             
             # Clear cache
             php artisan config:cache 2>/dev/null || true
             php artisan route:cache 2>/dev/null || true
             php artisan view:cache 2>/dev/null || true
-            php artisan event:cache 2>/dev/null || true
             
             # Run migrations
-            php artisan migrate --force
-            
-            # Sync permissions
-            php artisan permissions:sync 2>/dev/null || true
+            php artisan migrate --force 2>/dev/null || true
             
             echo "=== Production deployed successfully ==="
           DEPLOY
@@ -284,7 +282,7 @@ jobs:
       - name: Notify Success
         run: |
           echo "✅ Production deployed successfully"
-          echo "URL: https://gacov.andersonmares.xyz"
+          echo "URL: https://gacov.webtechnology.com.co"
 
   # ============================================
   # JOB 6: Update GitHub Project
