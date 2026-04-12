@@ -1,21 +1,72 @@
 {
-  "name": "Inversiones GACOV S.A.S.",
+  "name": "GACOV Inventarios",
   "short_name": "GACOV",
-  "description": "Sistema de control de inventario y surtido de máquinas",
-  "start_url": "/",
-  "scope": "/",
+  "description": "Sistema de gestión de inventarios para Inversiones GACOV S.A.S.",
+  "start_url": "/dashboard",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#0A0E1A",
   "theme_color": "#00D4FF",
-  "lang": "es",
-  "categories": ["business","utilities"],
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "es-CO",
+  "categories": ["business", "productivity"],
   "icons": [
-    {"src":"/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    {"name":"Nuevo surtido","url":"/stockings/create","description":"Registrar surtido de máquina"},
-    {"name":"Mi inventario","url":"/inventory/vehicle","description":"Ver inventario del vehículo"}
-  ]
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Ir al dashboard principal",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Inventario",
+      "short_name": "Inventario",
+      "description": "Ver inventario",
+      "url": "/inventory/warehouse",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Traslados",
+      "short_name": "Traslados",
+      "description": "Gestionar traslados",
+      "url": "/transfers",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Surtido",
+      "short_name": "Surtido",
+      "description": "Registrar surtido de máquina",
+      "url": "/stockings/create",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

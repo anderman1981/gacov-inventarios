@@ -13,7 +13,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
-use RuntimeException;
 use Throwable;
 
 final class ImportRoutesHandler
@@ -31,7 +30,7 @@ final class ImportRoutesHandler
         ]);
 
         try {
-            $reader = new RouteCatalogImport();
+            $reader = new RouteCatalogImport;
             Excel::import($reader, $file);
 
             [$processed, $errors, $totalRows] = $this->processRows($reader->rows());
@@ -80,11 +79,13 @@ final class ImportRoutesHandler
 
                 if ($routeCode === '') {
                     $errors[] = "Fila {$rowNumber}: el código de la ruta es obligatorio.";
+
                     continue;
                 }
 
                 if ($routeName === '') {
                     $errors[] = "Fila {$rowNumber}: el nombre de la ruta es obligatorio.";
+
                     continue;
                 }
 
@@ -94,6 +95,7 @@ final class ImportRoutesHandler
 
                     if (! $driver instanceof User) {
                         $errors[] = "Fila {$rowNumber}: no existe un usuario con email {$driverEmail}.";
+
                         continue;
                     }
                 }
@@ -114,7 +116,7 @@ final class ImportRoutesHandler
                         'type' => 'vehiculo',
                     ],
                     [
-                        'name' => 'Vehículo ' . $route->name,
+                        'name' => 'Vehículo '.$route->name,
                         'code' => $route->code,
                         'is_active' => $route->is_active,
                     ],

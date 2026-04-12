@@ -1,10 +1,13 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         if (DB::getDriverName() !== 'mysql') {
             return;
         }
@@ -15,7 +18,8 @@ return new class extends Migration {
         ) NOT NULL");
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         if (DB::getDriverName() !== 'mysql') {
             return;
         }

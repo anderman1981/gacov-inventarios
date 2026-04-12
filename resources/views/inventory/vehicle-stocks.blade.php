@@ -105,13 +105,9 @@
                 </div>
 
                 @if($route->vehicle_stocks->isNotEmpty())
-                    @php
-                        $previewStocks = $route->vehicle_stocks->sortByDesc('quantity')->take(5);
-                        $remainingStocks = max(0, $route->vehicle_stocks->count() - $previewStocks->count());
-                    @endphp
-                    <div class="table-scroll">
-                    <table class="data-table">
-                        <thead>
+                    <div class="vehicle-stocks-scroll" style="max-height: 280px; overflow-y: auto; border-radius: var(--radius-md); margin-top: var(--space-3);">
+                    <table class="data-table" style="margin: 0;">
+                        <thead style="position: sticky; top: 0; background: var(--gacov-bg-surface); z-index: 1;">
                             <tr>
                                 <th>Producto</th>
                                 <th>Código</th>
@@ -120,7 +116,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($previewStocks as $stock)
+                            @foreach($route->vehicle_stocks->sortByDesc('quantity') as $stock)
                                 <tr>
                                     <td>
                                         <div class="inventory-table-product">
@@ -136,11 +132,6 @@
                         </tbody>
                     </table>
                     </div>
-                    @if($remainingStocks > 0)
-                    <div class="inventory-panel-note" style="margin-top:0;border:1px solid #e9eff5;border-radius:16px">
-                        Vista rápida de 5 productos. Hay {{ number_format($remainingStocks, 0, ',', '.') }} productos más en esta ruta.
-                    </div>
-                    @endif
                 @else
                     <div class="inventory-empty" style="padding:var(--space-6) 0">
                         <p class="inventory-empty__title">Sin stock en este vehiculo</p>

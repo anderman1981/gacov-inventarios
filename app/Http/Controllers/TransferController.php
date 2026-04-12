@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CompleteTransferRequest;
@@ -35,11 +37,11 @@ final class TransferController extends Controller
         $transfers = $query->paginate(15)->withQueryString();
 
         $statusOptions = [
-            'pendiente'  => 'Pendiente',
-            'aprobado'   => 'Aprobada',
+            'pendiente' => 'Pendiente',
+            'aprobado' => 'Aprobada',
             'completado' => 'Completada',
-            'cancelado'  => 'Cancelada',
-            'borrador'   => 'Borrador',
+            'cancelado' => 'Cancelada',
+            'borrador' => 'Borrador',
         ];
 
         return view('transfers.index', compact('transfers', 'statusOptions'));
@@ -50,13 +52,13 @@ final class TransferController extends Controller
         abort_unless(auth()->user()?->can('transfers.create'), 403);
 
         $warehouses = Warehouse::where('is_active', true)->orderBy('name')->get();
-        $products   = Product::where('is_active', true)->orderBy('name')->get();
+        $products = Product::where('is_active', true)->orderBy('name')->get();
 
         // Cargar stock de todas las bodegas activas para mostrar disponibilidad
         $allStocks = Stock::whereIn('warehouse_id', $warehouses->pluck('id'))
             ->get()
             ->groupBy('warehouse_id')
-            ->map(fn($items) => $items->keyBy('product_id'));
+            ->map(fn ($items) => $items->keyBy('product_id'));
 
         return view('transfers.create', compact('warehouses', 'products', 'allStocks'));
     }
@@ -66,7 +68,7 @@ final class TransferController extends Controller
         abort_unless(auth()->user()?->can('transfers.create'), 403);
 
         $items = collect($request->input('items', []))
-            ->filter(fn($item) => (int) ($item['quantity_requested'] ?? 0) > 0);
+            ->filter(fn ($item) => (int) ($item['quantity_requested'] ?? 0) > 0);
 
         if ($items->isEmpty()) {
             return back()
@@ -74,7 +76,7 @@ final class TransferController extends Controller
                 ->withErrors(['items' => 'Debes ingresar al menos un producto con cantidad mayor a cero.']);
         }
 
-        $code = 'TRAS-' . now()->format('Ymd') . '-' . str_pad(
+        $code = 'TRAS-'.now()->format('Ymd').'-'.str_pad(
             (string) (TransferOrder::whereDate('created_at', today())->count() + 1),
             4,
             '0',
@@ -83,18 +85,18 @@ final class TransferController extends Controller
 
         DB::transaction(function () use ($request, $items, $code): void {
             $transfer = TransferOrder::create([
-                'code'                     => $code,
-                'origin_warehouse_id'      => $request->integer('origin_warehouse_id'),
+                'code' => $code,
+                'origin_warehouse_id' => $request->integer('origin_warehouse_id'),
                 'destination_warehouse_id' => $request->integer('destination_warehouse_id'),
-                'status'                   => 'pendiente',
-                'requested_by'             => auth()->id(),
-                'notes'                    => $request->input('notes'),
+                'status' => 'pendiente',
+                'requested_by' => auth()->id(),
+                'notes' => $request->input('notes'),
             ]);
 
             foreach ($items as $item) {
                 TransferOrderItem::create([
-                    'transfer_order_id'  => $transfer->id,
-                    'product_id'         => (int) $item['product_id'],
+                    'transfer_order_id' => $transfer->id,
+                    'product_id' => (int) $item['product_id'],
                     'quantity_requested' => (int) $item['quantity_requested'],
                 ]);
             }
@@ -129,7 +131,7 @@ final class TransferController extends Controller
         }
 
         $transfer->update([
-            'status'      => 'aprobado',
+            'status' => 'aprobado',
             'approved_by' => auth()->id(),
             'approved_at' => now(),
         ]);
@@ -158,7 +160,7 @@ final class TransferController extends Controller
                 // Decrementar stock en bodega origen
                 $originStock = Stock::firstOrNew([
                     'warehouse_id' => $transfer->origin_warehouse_id,
-                    'product_id'   => $item->product_id,
+                    'product_id' => $item->product_id,
                 ]);
                 $originStock->quantity = max(0, ($originStock->quantity ?? 0) - $dispatched);
                 $originStock->save();
@@ -166,46 +168,46 @@ final class TransferController extends Controller
                 // Incrementar stock en bodega destino
                 $destStock = Stock::firstOrNew([
                     'warehouse_id' => $transfer->destination_warehouse_id,
-                    'product_id'   => $item->product_id,
+                    'product_id' => $item->product_id,
                 ]);
                 $destStock->quantity = ($destStock->quantity ?? 0) + $received;
                 $destStock->save();
 
                 // Movimiento de salida en bodega origen
                 StockMovement::create([
-                    'movement_type'            => 'traslado_salida',
-                    'origin_warehouse_id'      => $transfer->origin_warehouse_id,
+                    'movement_type' => 'traslado_salida',
+                    'origin_warehouse_id' => $transfer->origin_warehouse_id,
                     'destination_warehouse_id' => $transfer->destination_warehouse_id,
-                    'product_id'               => $item->product_id,
-                    'quantity'                 => $dispatched,
-                    'reference_code'           => $transfer->code,
-                    'notes'                    => "Traslado {$transfer->code} — despacho",
-                    'performed_by'             => auth()->id(),
-                    'created_at'               => now(),
+                    'product_id' => $item->product_id,
+                    'quantity' => $dispatched,
+                    'reference_code' => $transfer->code,
+                    'notes' => "Traslado {$transfer->code} — despacho",
+                    'performed_by' => auth()->id(),
+                    'created_at' => now(),
                 ]);
 
                 // Movimiento de entrada en bodega destino
                 StockMovement::create([
-                    'movement_type'            => 'traslado_entrada',
-                    'origin_warehouse_id'      => $transfer->origin_warehouse_id,
+                    'movement_type' => 'traslado_entrada',
+                    'origin_warehouse_id' => $transfer->origin_warehouse_id,
                     'destination_warehouse_id' => $transfer->destination_warehouse_id,
-                    'product_id'               => $item->product_id,
-                    'quantity'                 => $received,
-                    'reference_code'           => $transfer->code,
-                    'notes'                    => "Traslado {$transfer->code} — recepción",
-                    'performed_by'             => auth()->id(),
-                    'created_at'               => now(),
+                    'product_id' => $item->product_id,
+                    'quantity' => $received,
+                    'reference_code' => $transfer->code,
+                    'notes' => "Traslado {$transfer->code} — recepción",
+                    'performed_by' => auth()->id(),
+                    'created_at' => now(),
                 ]);
 
                 // Actualizar cantidades en el item
                 $item->update([
                     'quantity_dispatched' => $dispatched,
-                    'quantity_received'   => $received,
+                    'quantity_received' => $received,
                 ]);
             }
 
             $transfer->update([
-                'status'       => 'completado',
+                'status' => 'completado',
                 'completed_by' => auth()->id(),
                 'completed_at' => now(),
             ]);

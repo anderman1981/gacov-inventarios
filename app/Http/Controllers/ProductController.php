@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProductRequest;
@@ -26,9 +28,9 @@ final class ProductController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('worldoffice_code', 'like', "%{$search}%")
-                  ->orWhere('id', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('worldoffice_code', 'like', "%{$search}%")
+                    ->orWhere('id', 'like', "%{$search}%");
             });
         }
 
@@ -51,11 +53,11 @@ final class ProductController extends Controller
             ->withQueryString();
 
         $categories = [
-            'snack'            => 'Snacks',
-            'bebida_fria'      => 'Bebidas frías',
-            'bebida_caliente'  => 'Bebidas calientes',
-            'insumo'           => 'Insumos',
-            'otro'             => 'Otros',
+            'snack' => 'Snacks',
+            'bebida_fria' => 'Bebidas frías',
+            'bebida_caliente' => 'Bebidas calientes',
+            'insumo' => 'Insumos',
+            'otro' => 'Otros',
         ];
 
         return view('products.index', [
@@ -73,6 +75,7 @@ final class ProductController extends Controller
     public function create(): View
     {
         abort_unless(auth()->user()?->can('products.create'), 403);
+
         return view('products.create');
     }
 
@@ -80,12 +83,14 @@ final class ProductController extends Controller
     {
         abort_unless(auth()->user()?->can('products.create'), 403);
         Product::create($request->validated());
+
         return redirect()->route('products.index')->with('success', 'Producto creado correctamente.');
     }
 
     public function edit(Product $product): View
     {
         abort_unless(auth()->user()?->can('products.edit'), 403);
+
         return view('products.edit', compact('product'));
     }
 
@@ -93,6 +98,7 @@ final class ProductController extends Controller
     {
         abort_unless(auth()->user()?->can('products.edit'), 403);
         $product->update($request->validated());
+
         return redirect()->route('products.index')->with('success', 'Producto actualizado correctamente.');
     }
 
@@ -106,6 +112,7 @@ final class ProductController extends Controller
         }
 
         $product->update(['is_active' => false]);
+
         return redirect()->route('products.index')->with('success', 'Producto desactivado correctamente.');
     }
 
@@ -114,6 +121,7 @@ final class ProductController extends Controller
         abort_unless(auth()->user()?->can('products.edit'), 403);
         $product->update(['is_active' => ! $product->is_active]);
         $estado = $product->is_active ? 'activado' : 'desactivado';
+
         return back()->with('success', "Producto {$estado} correctamente.");
     }
 

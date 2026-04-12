@@ -1,13 +1,52 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
+use App\Support\Logging\LogsActivity;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class TransferOrder extends Model
 {
+    use BelongsToTenant, HasFactory, LogsActivity;
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        self::creating(function (TransferOrder $order): void {
+            if (empty($order->code)) {
+                $order->code = self::generateCode();
+            }
+        });
+    }
+
+    /**
+     * Genera un código único para el traslado.
+     */
+    public static function generateCode(): string
+    {
+        $prefix = 'TRF';
+        $date = now()->format('ymd');
+        $random = strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 4));
+
+        return "{$prefix}-{$date}-{$random}";
+    }
+
+    /** Attributes to log for activity tracking */
+    protected static array $activityLogAttributes = [
+        'code',
+        'status',
+        'notes',
+    ];
+
+    protected static ?string $activityLogName = 'transfers';
+
     protected $fillable = [
         'code',
         'origin_warehouse_id',
@@ -24,7 +63,7 @@ final class TransferOrder extends Model
     protected function casts(): array
     {
         return [
-            'approved_at'  => 'datetime',
+            'approved_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }

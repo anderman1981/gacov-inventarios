@@ -1,19 +1,21 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 final class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // ── Permisos granulares ───────────────────────────────────────────
         $permissions = [
@@ -49,6 +51,9 @@ final class RoleSeeder extends Seeder
             'inventory.view',
             'inventory.load_excel',
             'inventory.adjust',
+
+            // Movimientos (historial)
+            'movements.view',
 
             // Traslados
             'transfers.view',
@@ -86,26 +91,26 @@ final class RoleSeeder extends Seeder
             'super_admin' => $permissions, // TODO sin excepción
 
             'admin' => [
-                'users.view','users.create','users.edit','users.delete','users.assign_roles',
-                'roles.view','roles.manage',
-                'products.view','products.create','products.edit','products.delete','products.import',
-                'machines.view','machines.create','machines.edit','machines.delete',
-                'inventory.view','inventory.load_excel','inventory.adjust',
-                'transfers.view','transfers.create','transfers.approve','transfers.complete',
+                'users.view', 'users.create', 'users.edit', 'users.delete', 'users.assign_roles',
+                'roles.view', 'roles.manage',
+                'products.view', 'products.create', 'products.edit', 'products.delete', 'products.import',
+                'machines.view', 'machines.create', 'machines.edit', 'machines.delete',
+                'inventory.view', 'inventory.load_excel', 'inventory.adjust',
+                'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.complete',
                 'stockings.view',
                 'sales.view',
-                'reports.view','reports.export_excel','reports.worldoffice',
+                'reports.view', 'reports.export_excel', 'reports.worldoffice',
                 'dashboard.full',
             ],
 
             'manager' => [
-                'products.view','products.create','products.edit',
-                'machines.view','machines.create','machines.edit',
-                'inventory.view','inventory.adjust',
-                'transfers.view','transfers.create','transfers.approve',
+                'products.view', 'products.create', 'products.edit',
+                'machines.view', 'machines.create', 'machines.edit',
+                'inventory.view', 'inventory.adjust',
+                'transfers.view', 'transfers.create', 'transfers.approve',
                 'stockings.view',
                 'sales.view',
-                'reports.view','reports.export_excel',
+                'reports.view', 'reports.export_excel',
                 'dashboard.full',
             ],
 
@@ -116,7 +121,7 @@ final class RoleSeeder extends Seeder
                 'transfers.view',
                 'stockings.view',
                 'sales.view',
-                'reports.view','reports.export_excel','reports.worldoffice',
+                'reports.view', 'reports.export_excel', 'reports.worldoffice',
                 'dashboard.full',
             ],
 
@@ -124,8 +129,8 @@ final class RoleSeeder extends Seeder
                 'machines.view',
                 'inventory.view',
                 'transfers.view',
-                'stockings.view','stockings.create','stockings.own',
-                'sales.view','sales.create','sales.own',
+                'stockings.view', 'stockings.create', 'stockings.own',
+                'sales.view', 'sales.create', 'sales.own',
                 'dashboard.own',
             ],
         ];
@@ -139,11 +144,11 @@ final class RoleSeeder extends Seeder
         $superAdmin = User::updateOrCreate(
             ['email' => 'superadmin@gacov.com.co'],
             [
-                'name'                 => 'Super Administrador',
-                'password'             => Hash::make('SuperGacov2026!$'),
-                'is_active'            => true,
+                'name' => 'Super Administrador',
+                'password' => Hash::make('SuperGacov2026!$'),
+                'is_active' => true,
                 'must_change_password' => false,
-                'email_verified_at'    => now(),
+                'email_verified_at' => now(),
             ]
         );
         $superAdmin->syncRoles(['super_admin']);
@@ -152,11 +157,11 @@ final class RoleSeeder extends Seeder
         $admin = User::updateOrCreate(
             ['email' => 'admin@gacov.com.co'],
             [
-                'name'                 => 'Administrador GACOV',
-                'password'             => Hash::make('AdminGacov2026!'),
-                'is_active'            => true,
+                'name' => 'Administrador GACOV',
+                'password' => Hash::make('AdminGacov2026!'),
+                'is_active' => true,
                 'must_change_password' => true,
-                'email_verified_at'    => now(),
+                'email_verified_at' => now(),
             ]
         );
         $admin->syncRoles(['admin']);

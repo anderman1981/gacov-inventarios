@@ -1,11 +1,13 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class MachineSaleItem extends Model
+final class MachineSaleItem extends Model
 {
     public $timestamps = false;
 
@@ -17,7 +19,7 @@ class MachineSaleItem extends Model
     {
         return [
             'quantity_sold' => 'integer',
-            'unit_price'    => 'decimal:2',
+            'unit_price' => 'decimal:2',
         ];
     }
 

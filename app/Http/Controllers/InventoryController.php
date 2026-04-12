@@ -1,17 +1,19 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Application\UseCase\Inventory\ImportInitialInventoryHandler;
 use App\Exports\InitialInventoryTemplateExport;
+use App\Http\Requests\AdjustStockRequest;
 use App\Http\Requests\ImportInitialInventoryRequest;
 use App\Models\ExcelImport;
-use App\Http\Requests\AdjustStockRequest;
 use App\Models\Machine;
 use App\Models\Product;
+use App\Models\Route;
 use App\Models\Stock;
 use App\Models\StockMovement;
-use App\Models\Route;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +33,7 @@ final class InventoryController extends Controller
 
         $stocks = null;
         $totalUnits = 0;
-        $totalSkus  = 0;
+        $totalSkus = 0;
         $visibleUnits = 0;
         $visibleLowStockCount = 0;
         $perPage = $this->resolvePerPage($request, 25);
@@ -60,7 +62,7 @@ final class InventoryController extends Controller
 
             $visibleCollection = $stocks->getCollection();
 
-            $totalSkus  = (clone $baseQuery)->where('stock.quantity', '>', 0)->count();
+            $totalSkus = (clone $baseQuery)->where('stock.quantity', '>', 0)->count();
             $totalUnits = (int) (clone $baseQuery)->sum('stock.quantity');
             $visibleUnits = (int) $visibleCollection->sum('quantity');
             $visibleLowStockCount = $visibleCollection
@@ -73,11 +75,11 @@ final class InventoryController extends Controller
         }
 
         $categories = [
-            'snack'            => 'Snacks',
-            'bebida_fria'      => 'Bebidas frías',
-            'bebida_caliente'  => 'Bebidas calientes',
-            'insumo'           => 'Insumos',
-            'otro'             => 'Otros',
+            'snack' => 'Snacks',
+            'bebida_fria' => 'Bebidas frías',
+            'bebida_caliente' => 'Bebidas calientes',
+            'insumo' => 'Insumos',
+            'otro' => 'Otros',
         ];
 
         return view('inventory.warehouse', compact(
@@ -101,7 +103,7 @@ final class InventoryController extends Controller
         $products = Product::where('is_active', true)->orderBy('name')->get();
 
         $selectedProduct = null;
-        $currentStock    = 0;
+        $currentStock = 0;
 
         if ($productId = $request->integer('product_id')) {
             $selectedProduct = Product::find($productId);
@@ -119,32 +121,32 @@ final class InventoryController extends Controller
     {
         abort_unless(auth()->user()?->can('inventory.adjust'), 403);
 
-        $warehouse  = Warehouse::findOrFail($request->integer('warehouse_id'));
-        $product    = Product::findOrFail($request->integer('product_id'));
-        $newQty     = $request->integer('new_quantity');
+        $warehouse = Warehouse::findOrFail($request->integer('warehouse_id'));
+        $product = Product::findOrFail($request->integer('product_id'));
+        $newQty = $request->integer('new_quantity');
 
         DB::transaction(function () use ($warehouse, $product, $newQty, $request): void {
             $stock = Stock::firstOrNew([
                 'warehouse_id' => $warehouse->id,
-                'product_id'   => $product->id,
+                'product_id' => $product->id,
             ]);
 
             $oldQty = $stock->quantity ?? 0;
-            $diff   = $newQty - $oldQty;
+            $diff = $newQty - $oldQty;
 
             $stock->quantity = $newQty;
             $stock->save();
 
             if ($diff !== 0) {
                 StockMovement::create([
-                    'product_id'               => $product->id,
-                    'origin_warehouse_id'      => $diff < 0 ? $warehouse->id : null,
+                    'product_id' => $product->id,
+                    'origin_warehouse_id' => $diff < 0 ? $warehouse->id : null,
                     'destination_warehouse_id' => $diff >= 0 ? $warehouse->id : null,
-                    'movement_type'            => 'ajuste_manual',
-                    'quantity'                 => abs($diff),
-                    'reference_code'           => 'AJUSTE-' . now()->format('YmdHis'),
-                    'notes'                    => $request->input('reason'),
-                    'performed_by'             => auth()->id(),
+                    'movement_type' => 'ajuste_manual',
+                    'quantity' => abs($diff),
+                    'reference_code' => 'AJUSTE-'.now()->format('YmdHis'),
+                    'notes' => $request->input('reason'),
+                    'performed_by' => auth()->id(),
                 ]);
             }
         });
@@ -165,7 +167,7 @@ final class InventoryController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->whereHas('product', fn($q) => $q->where('name', 'like', "%{$search}%"));
+            $query->whereHas('product', fn ($q) => $q->where('name', 'like', "%{$search}%"));
         }
 
         if ($from = $request->input('from')) {
@@ -181,14 +183,14 @@ final class InventoryController extends Controller
         $movements = $query->paginate($perPage)->withQueryString();
 
         $movementTypes = [
-            'carga_inicial'    => 'Carga inicial',
-            'ajuste_manual'    => 'Ajuste manual',
-            'traslado_salida'  => 'Traslado salida',
+            'carga_inicial' => 'Carga inicial',
+            'ajuste_manual' => 'Ajuste manual',
+            'traslado_salida' => 'Traslado salida',
             'traslado_entrada' => 'Traslado entrada',
-            'surtido_maquina'  => 'Surtido máquina',
-            'venta_maquina'    => 'Venta máquina',
-            'conteo_fisico'    => 'Conteo físico',
-            'exportado_wo'     => 'Exportado WO',
+            'surtido_maquina' => 'Surtido máquina',
+            'venta_maquina' => 'Venta máquina',
+            'conteo_fisico' => 'Conteo físico',
+            'exportado_wo' => 'Exportado WO',
         ];
 
         return view('inventory.movements', compact('movements', 'movementTypes', 'perPage', 'perPageOptions'));
@@ -360,7 +362,7 @@ final class InventoryController extends Controller
         abort_unless(auth()->user()?->can('inventory.load_excel'), 403);
 
         return Excel::download(
-            new InitialInventoryTemplateExport(),
+            new InitialInventoryTemplateExport,
             'template-carga-inicial-inventario.xlsx'
         );
     }

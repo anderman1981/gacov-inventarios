@@ -1,13 +1,18 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class MachineStockingRecord extends Model
+final class MachineStockingRecord extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
         'code', 'machine_id', 'route_id', 'vehicle_warehouse_id',
         'performed_by', 'status', 'offline_local_id', 'was_offline',
@@ -17,9 +22,9 @@ class MachineStockingRecord extends Model
     protected function casts(): array
     {
         return [
-            'started_at'   => 'datetime',
+            'started_at' => 'datetime',
             'completed_at' => 'datetime',
-            'was_offline'  => 'boolean',
+            'was_offline' => 'boolean',
         ];
     }
 

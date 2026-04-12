@@ -59,9 +59,31 @@ return [
 
     'local_ocr' => [
         'enabled' => (bool) env('LOCAL_OCR_ENABLED', false),
+        'strict' => (bool) env('LOCAL_OCR_STRICT', false),
         'endpoint' => env('LOCAL_OCR_ENDPOINT', 'http://127.0.0.1:8011'),
         'timeout' => (int) env('LOCAL_OCR_TIMEOUT', 120),
         'connect_timeout' => (int) env('LOCAL_OCR_CONNECT_TIMEOUT', 5),
+    ],
+
+    'chrome_devtools_mcp' => [
+        'command' => env('CHROME_DEVTOOLS_MCP_COMMAND', 'npx'),
+        'package' => env('CHROME_DEVTOOLS_MCP_PACKAGE', 'chrome-devtools-mcp@latest'),
+        'arguments' => array_values(array_filter(array_map(
+            static fn (string $argument): string => trim($argument),
+            explode(',', (string) env('CHROME_DEVTOOLS_MCP_ARGUMENTS', '--headless,--isolated,--no-usage-statistics'))
+        ), static fn (string $argument): bool => $argument !== '')),
+        'protocol_version' => env('CHROME_DEVTOOLS_MCP_PROTOCOL_VERSION', '2025-06-18'),
+        'startup_timeout' => (int) env('CHROME_DEVTOOLS_MCP_STARTUP_TIMEOUT', 45),
+        'request_timeout' => (int) env('CHROME_DEVTOOLS_MCP_REQUEST_TIMEOUT', 30),
+        'client_name' => env('CHROME_DEVTOOLS_MCP_CLIENT_NAME', 'gacov-inventarios'),
+        'client_version' => env('CHROME_DEVTOOLS_MCP_CLIENT_VERSION', '1.0.0'),
+        'knowledge_path' => env('CHROME_DEVTOOLS_MCP_KNOWLEDGE_PATH', 'ai/chrome-devtools-mcp'),
+        'repository' => [
+            'url' => env('CHROME_DEVTOOLS_MCP_REPOSITORY_URL', 'https://github.com/ChromeDevTools/chrome-devtools-mcp'),
+            'branch' => env('CHROME_DEVTOOLS_MCP_REPOSITORY_BRANCH', 'main'),
+            'timeout' => (int) env('CHROME_DEVTOOLS_MCP_REPOSITORY_TIMEOUT', 20),
+            'connect_timeout' => (int) env('CHROME_DEVTOOLS_MCP_REPOSITORY_CONNECT_TIMEOUT', 10),
+        ],
     ],
 
 ];

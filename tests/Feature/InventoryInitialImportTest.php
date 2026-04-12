@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,13 +19,16 @@ final class InventoryInitialImportTest extends TestCase
 
     public function test_import_screen_can_be_rendered_for_authorized_user(): void
     {
-        $user = $this->authorizedUser();
-        Warehouse::create([
+        $tenant = $this->createTenant();
+        $user = $this->authorizedUser($tenant);
+        $warehouse = new Warehouse([
             'name' => 'Bodega Principal',
             'code' => 'BODEGA',
             'type' => 'bodega',
             'is_active' => true,
         ]);
+        $warehouse->tenant_id = $tenant->id;
+        $warehouse->save();
 
         $response = $this->actingAs($user)->get(route('inventory.import.form'));
 
@@ -34,7 +38,8 @@ final class InventoryInitialImportTest extends TestCase
 
     public function test_template_can_be_downloaded(): void
     {
-        $user = $this->authorizedUser();
+        $tenant = $this->createTenant();
+        $user = $this->authorizedUser($tenant);
 
         $response = $this->actingAs($user)->get(route('inventory.import.template'));
 
@@ -44,15 +49,18 @@ final class InventoryInitialImportTest extends TestCase
 
     public function test_initial_inventory_can_be_imported_from_csv(): void
     {
-        $user = $this->authorizedUser();
-        $warehouse = Warehouse::create([
+        $tenant = $this->createTenant();
+        $user = $this->authorizedUser($tenant);
+        $warehouse = new Warehouse([
             'name' => 'Bodega Principal',
             'code' => 'BODEGA',
             'type' => 'bodega',
             'is_active' => true,
         ]);
+        $warehouse->tenant_id = $tenant->id;
+        $warehouse->save();
 
-        $product = Product::create([
+        $product = new Product([
             'code' => '124',
             'worldoffice_code' => '124',
             'name' => 'COCOSETTE WAFER',
@@ -62,15 +70,28 @@ final class InventoryInitialImportTest extends TestCase
             'min_stock_alert' => 5,
             'is_active' => true,
         ]);
+        $product->tenant_id = $tenant->id;
+        $product->save();
 
-        $file = UploadedFile::fake()->createWithContent(
-            'inventario-inicial.csv',
+        $filePath = tempnam(sys_get_temp_dir(), 'inventory-import-');
+        file_put_contents(
+            $filePath,
             "codigo_producto,cantidad_inicial,observaciones\n124,36,Carga inicial abril\n"
         );
 
-        $response = $this->actingAs($user)->post(route('inventory.import.store'), [
-            'inventory_file' => $file,
-        ]);
+        $file = new UploadedFile(
+            $filePath,
+            'inventario-inicial.csv',
+            'text/csv',
+            null,
+            true
+        );
+
+        $response = $this->actingAs($user)
+            ->from(route('inventory.import.form'))
+            ->post(route('inventory.import.store'), [
+                'inventory_file' => $file,
+            ]);
 
         $response->assertRedirect(route('inventory.import.form'));
 
@@ -85,13 +106,27 @@ final class InventoryInitialImportTest extends TestCase
             'status' => 'completado',
             'processed_rows' => 1,
         ]);
+
+        @unlink($filePath);
     }
 
-    private function authorizedUser(): User
+    private function createTenant(): Tenant
+    {
+        return Tenant::create([
+            'name' => 'Tenant de prueba',
+            'slug' => 'tenant-prueba',
+            'email' => 'tenant@example.com',
+            'is_active' => true,
+        ]);
+    }
+
+    private function authorizedUser(Tenant $tenant): User
     {
         Permission::findOrCreate('inventory.load_excel', 'web');
 
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'tenant_id' => $tenant->id,
+        ]);
         $user->givePermissionTo('inventory.load_excel');
 
         return $user;

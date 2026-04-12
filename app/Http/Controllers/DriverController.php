@@ -1,30 +1,36 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreStockingRequest;
+use App\Application\Command\Driver\RegisterSale;
+use App\Application\Command\Driver\RegisterStocking;
 use App\Http\Requests\StoreSaleRequest;
+use App\Http\Requests\StoreStockingRequest;
 use App\Models\Machine;
 use App\Models\MachineSale;
 use App\Models\MachineSaleItem;
-use App\Models\MachineStockingItem;
 use App\Models\MachineStockingRecord;
 use App\Models\Product;
 use App\Models\Route;
 use App\Models\Stock;
-use App\Models\StockMovement;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 final class DriverController extends Controller
 {
+    public function __construct(
+        private readonly RegisterStocking $registerStocking,
+        private readonly RegisterSale $registerSale,
+    ) {}
+
     public function dashboard(Request $request): View
     {
-        $user  = auth()->user();
+        $user = auth()->user();
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
 
@@ -40,6 +46,7 @@ final class DriverController extends Controller
                     $machine->total_stock = $machine->warehouse
                         ? $machine->warehouse->stocks->sum('quantity')
                         : 0;
+
                     return $machine;
                 });
 
@@ -90,6 +97,7 @@ final class DriverController extends Controller
                         ->where('product_id', $product->id)
                         ->value('quantity') ?? 0)
                     : 0;
+
                 return $product;
             });
 
@@ -110,85 +118,35 @@ final class DriverController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $vehicleWarehouse = Warehouse::where('route_id', $route->id)
-            ->where('type', 'vehiculo')
-            ->firstOrFail();
-
         $machineWarehouse = $machine->warehouse;
-
         if (! $machineWarehouse) {
             return back()->withInput()->with('error', 'La máquina no tiene bodega asignada.');
         }
 
+        $vehicleWarehouse = Warehouse::where('route_id', $route->id)
+            ->where('type', 'vehiculo')
+            ->firstOrFail();
+
         $items = collect($request->validated('items', []))
-            ->filter(fn(array $item): bool => ($item['quantity'] ?? 0) > 0);
+            ->filter(fn (array $item): bool => ($item['quantity'] ?? 0) > 0);
 
         if ($items->isEmpty()) {
             return back()->withInput()->with('error', 'Debe ingresar al menos un producto con cantidad mayor a cero.');
         }
 
-        foreach ($items as $productId => $item) {
-            $vehicleStock = (int) (Stock::where('warehouse_id', $vehicleWarehouse->id)
-                ->where('product_id', $productId)
-                ->value('quantity') ?? 0);
-
-            $requested = (int) $item['quantity'];
-
-            if ($vehicleStock < $requested) {
-                $product = Product::find($productId);
-                return back()->withInput()
-                    ->with('error', "Stock insuficiente en vehículo para «{$product?->name}». Disponible: {$vehicleStock}, solicitado: {$requested}.");
-            }
+        try {
+            $this->registerStocking->handle(
+                user: $user,
+                route: $route,
+                machine: $machine,
+                vehicleWarehouse: $vehicleWarehouse,
+                machineWarehouse: $machineWarehouse,
+                items: $items,
+                notes: $request->input('notes'),
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
-
-        DB::transaction(function () use ($user, $machine, $vehicleWarehouse, $machineWarehouse, $items, $request, $route): void {
-            $code = 'SURT-' . strtoupper(substr(uniqid(), -6));
-
-            $record = MachineStockingRecord::create([
-                'code'                => $code,
-                'machine_id'          => $machine->id,
-                'route_id'            => $route?->id,
-                'vehicle_warehouse_id' => $vehicleWarehouse->id,
-                'performed_by'        => $user->id,
-                'status'              => 'completado',
-                'notes'               => $request->input('notes'),
-                'was_offline'         => false,
-                'started_at'          => now(),
-                'completed_at'        => now(),
-            ]);
-
-            foreach ($items as $productId => $item) {
-                $qty = (int) $item['quantity'];
-
-                MachineStockingItem::create([
-                    'stocking_record_id' => $record->id,
-                    'product_id'         => (int) $productId,
-                    'quantity_loaded'    => $qty,
-                ]);
-
-                // Decrementar vehículo
-                $vs = Stock::firstOrNew(['warehouse_id' => $vehicleWarehouse->id, 'product_id' => (int) $productId]);
-                $vs->quantity = ($vs->quantity ?? 0) - $qty;
-                $vs->save();
-
-                // Incrementar máquina
-                $ms = Stock::firstOrNew(['warehouse_id' => $machineWarehouse->id, 'product_id' => (int) $productId]);
-                $ms->quantity = ($ms->quantity ?? 0) + $qty;
-                $ms->save();
-
-                // Movimiento
-                StockMovement::create([
-                    'product_id'              => (int) $productId,
-                    'origin_warehouse_id'     => $vehicleWarehouse->id,
-                    'destination_warehouse_id' => $machineWarehouse->id,
-                    'movement_type'           => 'surtido_maquina',
-                    'quantity'                => $qty,
-                    'reference_code'          => $code,
-                    'notes'                   => "Surtido máquina {$machine->code}",
-                    'performed_by'            => $user->id,
-                ]);
-            }
-        });
 
         return redirect()->route('driver.dashboard', ['route_id' => $route->id])
             ->with('success', "Surtido registrado para la máquina {$machine->name}.");
@@ -224,72 +182,28 @@ final class DriverController extends Controller
             ->firstOrFail();
 
         $machineWarehouse = $machine->warehouse;
-
         if (! $machineWarehouse) {
             return back()->withInput()->with('error', 'La máquina no tiene bodega asignada.');
         }
 
         $items = collect($request->validated('items', []))
-            ->filter(fn(array $item): bool => ($item['quantity'] ?? 0) > 0);
+            ->filter(fn (array $item): bool => ($item['quantity'] ?? 0) > 0);
 
         if ($items->isEmpty()) {
             return back()->withInput()->with('error', 'Debe ingresar al menos un producto con cantidad mayor a cero.');
         }
 
-        foreach ($items as $productId => $item) {
-            $machineStock = (int) (Stock::where('warehouse_id', $machineWarehouse->id)
-                ->where('product_id', $productId)
-                ->value('quantity') ?? 0);
-
-            $requested = (int) $item['quantity'];
-
-            if ($machineStock < $requested) {
-                $product = Product::find($productId);
-                return back()->withInput()
-                    ->with('error', "Stock insuficiente en máquina para «{$product?->name}». Disponible: {$machineStock}, vendido: {$requested}.");
-            }
+        try {
+            $this->registerSale->handle(
+                user: $user,
+                machine: $machine,
+                machineWarehouse: $machineWarehouse,
+                items: $items,
+                notes: $request->input('notes'),
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
-
-        DB::transaction(function () use ($user, $machine, $machineWarehouse, $items, $request): void {
-            $code = 'VENTA-' . strtoupper(substr(uniqid(), -6));
-
-            $sale = MachineSale::create([
-                'code'          => $code,
-                'machine_id'    => $machine->id,
-                'registered_by' => $user->id,
-                'status'        => 'completado',
-                'sale_date'     => today(),
-                'notes'         => $request->input('notes'),
-                'was_offline'   => false,
-            ]);
-
-            foreach ($items as $productId => $item) {
-                $qty       = (int) $item['quantity'];
-                $unitPrice = (float) ($item['unit_price'] ?? 0);
-
-                MachineSaleItem::create([
-                    'machine_sale_id' => $sale->id,
-                    'product_id'      => (int) $productId,
-                    'quantity_sold'   => $qty,
-                    'unit_price'      => $unitPrice,
-                ]);
-
-                $stock = Stock::firstOrNew(['warehouse_id' => $machineWarehouse->id, 'product_id' => (int) $productId]);
-                $stock->quantity = ($stock->quantity ?? 0) - $qty;
-                $stock->save();
-
-                StockMovement::create([
-                    'product_id'          => (int) $productId,
-                    'origin_warehouse_id' => $machineWarehouse->id,
-                    'movement_type'       => 'venta_maquina',
-                    'quantity'            => $qty,
-                    'unit_cost'           => $unitPrice,
-                    'reference_code'      => $code,
-                    'notes'               => "Venta en máquina {$machine->code}",
-                    'performed_by'        => $user->id,
-                ]);
-            }
-        });
 
         return redirect()->route('driver.dashboard', ['route_id' => $route->id])
             ->with('success', "Venta registrada para la máquina {$machine->name}.");

@@ -31,13 +31,13 @@ final class MachineRequest extends FormRequest
                 'max:20',
                 Rule::unique('machines', 'code')->ignore($machineId),
             ],
-            'worldoffice_code'  => ['nullable', 'string', 'max:20'],
-            'name'              => ['required', 'string', 'max:150'],
-            'location'          => ['nullable', 'string', 'max:255'],
-            'route_id'          => ['nullable', 'integer', 'exists:routes,id'],
-            'operator_user_id'  => ['nullable', 'integer', 'exists:users,id'],
-            'type'              => ['nullable', 'string', 'max:50'],
-            'is_active'         => ['boolean'],
+            'worldoffice_code' => ['nullable', 'string', 'max:20'],
+            'name' => ['required', 'string', 'max:150'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'route_id' => ['nullable', 'integer', 'exists:routes,id'],
+            'operator_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'type' => ['nullable', 'string', 'max:50'],
+            'is_active' => ['boolean'],
         ];
     }
 
@@ -47,16 +47,16 @@ final class MachineRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'code.required'    => 'El código de la máquina es obligatorio.',
-            'code.max'         => 'El código no puede superar los 20 caracteres.',
-            'code.unique'      => 'Este código ya está registrado para otra máquina.',
-            'name.required'    => 'El nombre de la máquina es obligatorio.',
-            'name.max'         => 'El nombre no puede superar los 150 caracteres.',
-            'location.max'     => 'La ubicación no puede superar los 255 caracteres.',
+            'code.required' => 'El código de la máquina es obligatorio.',
+            'code.max' => 'El código no puede superar los 20 caracteres.',
+            'code.unique' => 'Este código ya está registrado para otra máquina.',
+            'name.required' => 'El nombre de la máquina es obligatorio.',
+            'name.max' => 'El nombre no puede superar los 150 caracteres.',
+            'location.max' => 'La ubicación no puede superar los 255 caracteres.',
             'worldoffice_code.max' => 'El código WorldOffice no puede superar los 20 caracteres.',
-            'route_id.exists'      => 'La ruta seleccionada no existe.',
+            'route_id.exists' => 'La ruta seleccionada no existe.',
             'operator_user_id.exists' => 'El operador seleccionado no existe.',
-            'type.max'         => 'El tipo no puede superar los 50 caracteres.',
+            'type.max' => 'El tipo no puede superar los 50 caracteres.',
         ];
     }
 

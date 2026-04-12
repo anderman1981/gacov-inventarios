@@ -42,7 +42,7 @@ final class ImportInitialInventoryHandler
         ]);
 
         try {
-            $reader = new InitialInventoryImport();
+            $reader = new InitialInventoryImport;
             Excel::import($reader, $file);
 
             [$processed, $errors, $totalRows] = $this->processRows(
@@ -98,11 +98,13 @@ final class ImportInitialInventoryHandler
 
                 if ($code === '') {
                     $errors[] = "Fila {$rowNumber}: el código del producto es obligatorio.";
+
                     continue;
                 }
 
                 if ($quantity === null || $quantity < 0) {
                     $errors[] = "Fila {$rowNumber}: la cantidad inicial debe ser un número entero mayor o igual a cero.";
+
                     continue;
                 }
 
@@ -113,6 +115,7 @@ final class ImportInitialInventoryHandler
 
                 if (! $product instanceof Product) {
                     $errors[] = "Fila {$rowNumber}: no existe un producto con código {$code}.";
+
                     continue;
                 }
 

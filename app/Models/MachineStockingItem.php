@@ -1,11 +1,13 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class MachineStockingItem extends Model
+final class MachineStockingItem extends Model
 {
     public $timestamps = false;
 
@@ -17,10 +19,10 @@ class MachineStockingItem extends Model
     protected function casts(): array
     {
         return [
-            'quantity_loaded'       => 'integer',
+            'quantity_loaded' => 'integer',
             'physical_count_before' => 'integer',
-            'physical_count_after'  => 'integer',
-            'difference'            => 'integer',
+            'physical_count_after' => 'integer',
+            'difference' => 'integer',
         ];
     }
 

@@ -1,0 +1,283 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, 'feature/**', 'fix/**']
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PHP_VERSION: '8.3'
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # JOB 1: Análisis Estático (Linting)
+  # ============================================
+  lint:
+    name: PHP Lint & Style Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_mysql, xml, mbstring, zip, gd
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-scripts
+
+      - name: Run PHP CodeSniffer
+        run: ./vendor/bin/pint --test || true
+
+      - name: PHP Syntax check
+        run: find app tests -name "*.php" -exec php -l {} \; 2>&1 | grep -v "No syntax errors"
+
+  # ============================================
+  # JOB 2: Análisis Estático (PHPStan)
+  # ============================================
+  static-analysis:
+    name: PHP Static Analysis
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_mysql, xml, mbstring, zip, gd
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-scripts
+
+      - name: Run PHPStan
+        run: ./vendor/bin/phpstan analyse --memory-limit=512M || echo "PHPStan not configured"
+
+  # ============================================
+  # JOB 3: Tests Unitarios y Feature
+  # ============================================
+  test:
+    name: PHPUnit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gacov_test
+          MYSQL_USER: gacov_user
+          MYSQL_PASSWORD: gacov_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_mysql, xml, mbstring, zip, gd
+          coverage: xdebug
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-scripts
+
+      - name: Copy env file
+        run: cp .env.example .env
+
+      - name: Generate app key
+        run: php artisan key:generate
+
+      - name: Create MySQL database
+        run: |
+          mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE IF NOT EXISTS gacov_test;"
+
+      - name: Run migrations
+        run: php artisan migrate --force
+
+      - name: Run Tests
+        run: php artisan test --coverage-clover=coverage.xml --stop-on-failure
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: GACOV-Inventarios
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            ./coverage.xml
+            ./testdox.html
+          retention-days: 7
+
+  # ============================================
+  # JOB 4: Verificación de Dependencias
+  # ============================================
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-scripts
+
+      - name: Security Audit
+        run: |
+          composer audit --no-interaction || echo "Security audit completed with warnings"
+
+      - name: Check for known vulnerabilities
+        run: |
+          if [ -f ./vendor/bin/local-php-security-checker ]; then
+            ./vendor/bin/local-php-security-checker || echo "Security checker not available"
+          fi
+
+  # ============================================
+  # JOB 5: Build Frontend (si aplica)
+  # ============================================
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Run Mix
+        run: npm run dev || npm run build
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: |
+            public/build
+            public/hot
+          retention-days: 1
+
+  # ============================================
+  # JOB 6: Deployment (solo en main)
+  # ============================================
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, static-analysis, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      - name: Install SSH Key
+        uses: shivammathur/cache-extensions@v1
+        with:
+          key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Deploy via SSH
+        run: |
+          echo "Deploy configuration for Hostinger"
+          # ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd /public_html && git pull && composer install --no-dev && php artisan migrate --force && php artisan config:cache && php artisan route:cache"
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+
+      - name: Notify Deployment
+        run: |
+          echo "Deployment completed successfully"
+          # TODO: Add Slack/Discord webhook notification

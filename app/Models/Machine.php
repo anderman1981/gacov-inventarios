@@ -1,13 +1,19 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Machine extends Model
+final class Machine extends Model
 {
+    use BelongsToTenant, HasFactory;
+
     protected $fillable = [
         'code', 'worldoffice_code', 'name', 'location',
         'route_id', 'operator_user_id', 'type', 'is_active',

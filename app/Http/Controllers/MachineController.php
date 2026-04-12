@@ -17,10 +17,10 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
-use Illuminate\View\View;
 
 final class MachineController extends Controller
 {
@@ -50,7 +50,7 @@ final class MachineController extends Controller
         $this->authorizeBulkImport();
 
         return Excel::download(
-            new RoutesTemplateExport(),
+            new RoutesTemplateExport,
             'template-carga-rutas.xlsx'
         );
     }
@@ -86,7 +86,7 @@ final class MachineController extends Controller
         $this->authorizeBulkImport();
 
         return Excel::download(
-            new MachinesTemplateExport(),
+            new MachinesTemplateExport,
             'template-carga-maquinas.xlsx'
         );
     }
@@ -126,7 +126,7 @@ final class MachineController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -141,8 +141,8 @@ final class MachineController extends Controller
         $machines = $query->orderBy('name')->paginate(20)->withQueryString();
 
         // Cargar stock total de cada máquina desde su bodega tipo 'maquina'
-        $machineIds   = $machines->pluck('id')->toArray();
-        $warehouses   = Warehouse::whereIn('machine_id', $machineIds)
+        $machineIds = $machines->pluck('id')->toArray();
+        $warehouses = Warehouse::whereIn('machine_id', $machineIds)
             ->where('type', 'maquina')
             ->get()
             ->keyBy('machine_id');
@@ -202,7 +202,7 @@ final class MachineController extends Controller
     {
         abort_unless(auth()->user()?->can('machines.create'), 403);
 
-        $routes    = Route::where('is_active', true)->orderBy('name')->get();
+        $routes = Route::where('is_active', true)->orderBy('name')->get();
         $operators = User::where('is_active', true)->orderBy('name')->get();
 
         return view('machines.create', compact('routes', 'operators'));
@@ -221,11 +221,11 @@ final class MachineController extends Controller
 
         if (! $existingWarehouse) {
             Warehouse::create([
-                'name'      => 'Bodega ' . $machine->name,
-                'code'      => $machine->code,
-                'type'      => 'maquina',
+                'name' => 'Bodega '.$machine->name,
+                'code' => $machine->code,
+                'type' => 'maquina',
                 'machine_id' => $machine->id,
-                'route_id'  => $machine->route_id,
+                'route_id' => $machine->route_id,
                 'is_active' => true,
             ]);
         }
@@ -238,7 +238,7 @@ final class MachineController extends Controller
     {
         abort_unless(auth()->user()?->can('machines.edit'), 403);
 
-        $routes    = Route::where('is_active', true)->orderBy('name')->get();
+        $routes = Route::where('is_active', true)->orderBy('name')->get();
         $operators = User::where('is_active', true)->orderBy('name')->get();
 
         return view('machines.edit', compact('machine', 'routes', 'operators'));

@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
+
 return [
-    'empresa_nombre'    => env('GACOV_EMPRESA_NOMBRE', 'INVERSIONES GACOV S.A.S.'),
-    'empresa_nit'       => env('GACOV_EMPRESA_NIT', '900983146'),
+    'empresa_nombre' => env('GACOV_EMPRESA_NOMBRE', 'INVERSIONES GACOV S.A.S.'),
+    'empresa_nit' => env('GACOV_EMPRESA_NIT', '900983146'),
     'wo_tipo_documento' => env('GACOV_WO_TIPO_DOCUMENTO', 'EA'),
-    'wo_nota_traslado'  => env('GACOV_WO_NOTA_TRASLADO', 'Entrada por Traslado'),
-    'upload_max_mb'     => (int) env('GACOV_UPLOAD_MAX_MB', 10),
+    'wo_nota_traslado' => env('GACOV_WO_NOTA_TRASLADO', 'Entrada por Traslado'),
+    'upload_max_mb' => (int) env('GACOV_UPLOAD_MAX_MB', 10),
     'offline' => [
         'cache_version' => 'v1',
-        'token_hours'   => 24,
+        'token_hours' => 24,
         'sync_endpoint' => '/api/stocking/sync',
         'data_endpoint' => '/api/sync/my-data',
     ],

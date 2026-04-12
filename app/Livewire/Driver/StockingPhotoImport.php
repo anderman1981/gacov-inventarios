@@ -102,7 +102,9 @@ final class StockingPhotoImport extends Component
         $this->extendExecutionWindow();
         $this->validate([
             'photos' => ['required', 'array', 'min:1', 'max:4'],
-            'photos.*' => ['image', 'mimes:jpg,jpeg,png', 'max:8192'],
+            // mimes valida magic bytes (finfo), image valida con getimagesize()
+            // dimensions limita a 6000×6000 para evitar DoS por imágenes gigantes en Ollama
+            'photos.*' => ['image', 'mimes:jpg,jpeg,png', 'max:8192', 'dimensions:max_width=6000,max_height=6000'],
         ]);
 
         $this->resetState();
@@ -110,17 +112,14 @@ final class StockingPhotoImport extends Component
         $this->dispatchProgress(10, 'Preparando planillas de surtido...');
 
         try {
-            $mergedRows = [];
-            $detectedMachineColumns = [];
+            $payloads = [];
             $providersUsed = [];
-            $detectedRoute = null;
-            $detectedOperator = null;
 
             foreach ($this->photos as $index => $photo) {
                 $this->extendExecutionWindow();
                 $this->dispatchProgress(
                     20 + ($index * 20),
-                    'Analizando planilla ' . ($index + 1) . ' de ' . count($this->photos) . ' con IA...'
+                    'Analizando planilla '.($index + 1).' de '.count($this->photos).' con IA...'
                 );
 
                 $result = $this->processWithAvailableProviders($photo, $index + 1, count($this->photos));
@@ -133,62 +132,10 @@ final class StockingPhotoImport extends Component
                         'photos' => 'No se detectaron filas válidas en la planilla de surtido.',
                     ]);
                 }
-
-                $detectedRoute ??= $this->normalizeNullableString(Arr::get($payload, 'ruta_detectada'));
-                $detectedOperator ??= $this->normalizeNullableString(Arr::get($payload, 'rutero_detectado'));
-
-                foreach ($rows as $row) {
-                    $normalizedRow = $this->normalizeRow($row);
-                    $codeKey = $this->normalizeProductCode($normalizedRow['cod']);
-
-                    if ($codeKey === '') {
-                        continue;
-                    }
-
-                    if (array_key_exists($codeKey, $mergedRows)) {
-                        $mergedRows[$codeKey] = $this->mergeRows($mergedRows[$codeKey], $normalizedRow);
-                    } else {
-                        $mergedRows[$codeKey] = $normalizedRow;
-                    }
-
-                    foreach (array_keys($normalizedRow['maquinas']) as $machineColumn) {
-                        $detectedMachineColumns[$machineColumn] = $machineColumn;
-                    }
-                }
+                $payloads[] = $payload;
             }
 
-            $this->parsedRows = array_values($mergedRows);
-            usort($this->parsedRows, fn (array $left, array $right): int => strcmp($left['producto'], $right['producto']));
-
-            $this->machineColumns = array_values($detectedMachineColumns);
-            natcasesort($this->machineColumns);
-            $this->machineColumns = array_values($this->machineColumns);
-            $this->sheetRouteName = $detectedRoute;
-            $this->sheetOperatorName = $detectedOperator;
-
-            $matchedProducts = collect($this->parsedRows)
-                ->filter(fn (array $row): bool => isset($this->productCatalog[$this->normalizeProductCode($row['cod'])]))
-                ->count();
-
-            $matchedMachines = collect($this->machineColumns)
-                ->filter(fn (string $column): bool => isset($this->routeMachines[$this->normalizeMachineCode($column)]))
-                ->count();
-
-            $this->summaryMessage = 'Planilla procesada con ' . implode(' + ', array_values($providersUsed))
-                . ". Filas detectadas: " . count($this->parsedRows)
-                . ". Productos reconocidos: {$matchedProducts}."
-                . " Máquinas de la ruta reconocidas: {$matchedMachines}.";
-
-            $this->dispatch(
-                'driver-stocking-photo-imported',
-                rows: $this->buildRowsForBrowser(),
-                machineColumns: $this->machineColumns,
-                sheetRouteName: $this->sheetRouteName,
-                sheetOperatorName: $this->sheetOperatorName,
-            );
-
-            $this->dispatchProgress(100, 'Planilla de surtido lista para aplicar a la máquina seleccionada.');
-            $this->dispatchToast('success', 'La planilla quedó lista. Selecciona una máquina de la ruta para aplicar sus cantidades.');
+            $this->finalizeProcessedPayloads($payloads, $providersUsed);
         } catch (Throwable $exception) {
             $this->lastError = $exception instanceof ValidationException
                 ? collect($exception->errors())->flatten()->first()
@@ -197,7 +144,9 @@ final class StockingPhotoImport extends Component
             Log::error('driver_stocking_photo_import_failed', [
                 'user_id' => auth()->id(),
                 'exception' => $exception::class,
-                'message' => $exception->getMessage(),
+                // Truncado a 300 chars para evitar que mensajes de excepción
+                // expongan queries SQL, tokens o rutas internas en el log
+                'message' => mb_substr($exception->getMessage(), 0, 300),
             ]);
 
             $this->dispatchToast('error', $this->lastError ?? 'No fue posible procesar la planilla.');
@@ -207,17 +156,55 @@ final class StockingPhotoImport extends Component
         }
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $payloads
+     */
+    public function acceptClientOcrPayloads(array $payloads, string $provider = 'OCR local'): void
+    {
+        $this->authorizeUsage();
+        $this->resetState();
+
+        try {
+            $this->finalizeProcessedPayloads($payloads, [$provider => $provider]);
+        } catch (Throwable $exception) {
+            $this->lastError = $exception instanceof ValidationException
+                ? collect($exception->errors())->flatten()->first()
+                : $exception->getMessage();
+
+            Log::error('driver_stocking_photo_client_ocr_failed', [
+                'user_id' => auth()->id(),
+                'exception' => $exception::class,
+                'message' => mb_substr($exception->getMessage(), 0, 300),
+            ]);
+
+            $this->dispatchToast('error', $this->lastError ?? 'No fue posible procesar la planilla.');
+        } finally {
+            $this->processing = false;
+            $this->processingMessage = null;
+        }
+    }
+
+    public function reportClientOcrError(string $message): void
+    {
+        $this->authorizeUsage();
+        $this->processing = false;
+        $this->processingMessage = null;
+        $this->lastError = trim($message) !== '' ? trim($message) : 'No fue posible procesar la planilla con OCR local.';
+
+        $this->dispatchToast('error', $this->lastError);
+    }
+
     public function enableManualMode(): void
     {
         $this->authorizeUsage();
         $this->manualMode = true;
-        $this->lastError  = null;
+        $this->lastError = null;
     }
 
     public function disableManualMode(): void
     {
         $this->manualMode = false;
-        $this->lastError  = null;
+        $this->lastError = null;
     }
 
     /**
@@ -234,12 +221,13 @@ final class StockingPhotoImport extends Component
         if ($machineKey === '') {
             $this->lastError = 'Selecciona una máquina antes de guardar.';
             $this->dispatchToast('error', $this->lastError);
+
             return;
         }
 
         $normalizedKey = $this->normalizeMachineCode($machineKey);
-        $machine       = $this->routeMachines[$normalizedKey] ?? null;
-        $machineLabel  = $machine !== null ? $machine['code'] : strtoupper($machineKey);
+        $machine = $this->routeMachines[$normalizedKey] ?? null;
+        $machineLabel = $machine !== null ? $machine['code'] : strtoupper($machineKey);
 
         $rows = [];
 
@@ -257,39 +245,40 @@ final class StockingPhotoImport extends Component
             }
 
             $rows[] = [
-                'code'        => $product['code'],
+                'code' => $product['code'],
                 'catalogCode' => $product['code'],
-                'product'     => $product['name'],
-                'quantities'  => [$normalizedKey => $qty],
+                'product' => $product['name'],
+                'quantities' => [$normalizedKey => $qty],
             ];
         }
 
         if ($rows === []) {
             $this->lastError = 'Ingresa al menos una cantidad mayor a cero para continuar.';
             $this->dispatchToast('error', $this->lastError);
+
             return;
         }
 
         $this->machineColumns = [$machineLabel];
-        $this->parsedRows     = array_map(fn (array $row): array => [
-            'cod'      => $row['code'],
+        $this->parsedRows = array_map(fn (array $row): array => [
+            'cod' => $row['code'],
             'producto' => $row['product'],
             'maquinas' => $row['quantities'],
         ], $rows);
 
         $this->summaryMessage = "Entrada manual — Máquina {$machineLabel}. "
-            . count($rows) . ' producto(s) con cantidad asignada.';
+            .count($rows).' producto(s) con cantidad asignada.';
 
         $this->dispatch(
             'driver-stocking-photo-imported',
-            rows:              $rows,
-            machineColumns:    [$machineLabel],
-            sheetRouteName:    null,
+            rows: $rows,
+            machineColumns: [$machineLabel],
+            sheetRouteName: null,
             sheetOperatorName: auth()->user()?->name,
         );
 
         $this->dispatchToast('success', "Planilla manual lista para máquina {$machineLabel}.");
-        $this->lastError  = null;
+        $this->lastError = null;
         $this->manualMode = false;
     }
 
@@ -311,7 +300,7 @@ final class StockingPhotoImport extends Component
         $attemptErrors = [];
         $attemptedProviders = 0;
 
-        foreach (['local_ocr', 'gemini', 'openai'] as $provider) {
+        foreach ($this->providerSequence() as $provider) {
             if (! $this->isProviderConfigured($provider)) {
                 continue;
             }
@@ -331,7 +320,7 @@ final class StockingPhotoImport extends Component
                     'provider' => $provider,
                 ];
             } catch (Throwable $exception) {
-                $attemptErrors[] = $this->providerDisplayName($provider) . ': ' . $this->friendlyExceptionMessage($provider, $exception);
+                $attemptErrors[] = $this->providerDisplayName($provider).': '.$this->friendlyExceptionMessage($provider, $exception);
 
                 Log::warning('driver_stocking_photo_import_provider_failed', [
                     'user_id' => auth()->id(),
@@ -342,7 +331,7 @@ final class StockingPhotoImport extends Component
                     'message' => $exception->getMessage(),
                 ]);
 
-                if ($provider === 'local_ocr' && $this->isProviderConfigured('gemini')) {
+                if ($provider === 'local_ocr' && ! $this->usesStrictLocalOcr() && $this->isProviderConfigured('gemini')) {
                     $this->dispatchProgress(
                         min(95, 24 + ($photoNumber * 14)),
                         "OCR local no respondió para la planilla {$photoNumber}. Intentando con Gemini..."
@@ -359,6 +348,10 @@ final class StockingPhotoImport extends Component
         }
 
         if ($attemptedProviders === 0) {
+            if ($this->usesStrictLocalOcr()) {
+                throw new RuntimeException('Debes habilitar LOCAL_OCR_ENABLED y arrancar el servicio Python para procesar planillas de surtido con OCR local.');
+            }
+
             throw new RuntimeException('Debes habilitar OCR local, GEMINI_API_KEY u OPENAI_API_KEY para procesar planillas de surtido.');
         }
 
@@ -418,6 +411,7 @@ final class StockingPhotoImport extends Component
 
                 if ($this->shouldRetryGeminiWithNextModel($response->status(), $message, $index, count($models))) {
                     $lastException = new RuntimeException($friendlyMessage);
+
                     continue;
                 }
 
@@ -461,7 +455,7 @@ final class StockingPhotoImport extends Component
             throw new RuntimeException('No fue posible leer una de las imágenes seleccionadas.');
         }
 
-        $imageDataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($binary);
+        $imageDataUrl = 'data:'.$mimeType.';base64,'.base64_encode($binary);
 
         $response = Http::acceptJson()
             ->connectTimeout($connectTimeout)
@@ -831,6 +825,24 @@ PROMPT;
         return array_values(array_unique(array_filter(array_merge([$primaryModel], $fallbackModels))));
     }
 
+    /**
+     * @return array<int, string>
+     */
+    private function providerSequence(): array
+    {
+        if ($this->usesStrictLocalOcr()) {
+            return ['local_ocr'];
+        }
+
+        return ['local_ocr', 'gemini', 'openai'];
+    }
+
+    private function usesStrictLocalOcr(): bool
+    {
+        return (bool) config('services.local_ocr.enabled', false)
+            && (bool) config('services.local_ocr.strict', false);
+    }
+
     private function providerDisplayName(string $provider): string
     {
         return match ($provider) {
@@ -919,9 +931,15 @@ PROMPT;
      */
     private function buildUnavailableProvidersMessage(array $attemptErrors): string
     {
+        if ($this->usesStrictLocalOcr()) {
+            return 'No fue posible procesar la planilla con OCR local. '
+                .implode(' ', array_values(array_unique(array_filter($attemptErrors))))
+                .' Verifica que el servicio Python esté activo, que Ollama esté iniciado y vuelve a intentar.';
+        }
+
         return 'No fue posible procesar la planilla en este momento. '
-            . implode(' ', array_values(array_unique(array_filter($attemptErrors))))
-            . ' Puedes reintentar en unos minutos o revisar la configuración y cuota de los proveedores.';
+            .implode(' ', array_values(array_unique(array_filter($attemptErrors))))
+            .' Puedes reintentar en unos minutos o revisar la configuración y cuota de los proveedores.';
     }
 
     private function dispatchProgress(int $progress, string $message): void
@@ -943,5 +961,96 @@ PROMPT;
         $this->sheetOperatorName = null;
         $this->parsedRows = [];
         $this->machineColumns = [];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $payloads
+     * @param  array<string, string>  $providersUsed
+     */
+    private function finalizeProcessedPayloads(array $payloads, array $providersUsed): void
+    {
+        if ($payloads === []) {
+            throw ValidationException::withMessages([
+                'photos' => 'No se detectaron filas válidas en la planilla de surtido.',
+            ]);
+        }
+
+        $mergedRows = [];
+        $detectedMachineColumns = [];
+        $detectedRoute = null;
+        $detectedOperator = null;
+
+        foreach ($payloads as $payload) {
+            $rows = Arr::get($payload, 'filas', []);
+
+            if (! is_array($rows) || $rows === []) {
+                continue;
+            }
+
+            $detectedRoute ??= $this->normalizeNullableString(Arr::get($payload, 'ruta_detectada'));
+            $detectedOperator ??= $this->normalizeNullableString(Arr::get($payload, 'rutero_detectado'));
+
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $normalizedRow = $this->normalizeRow($row);
+                $codeKey = $this->normalizeProductCode($normalizedRow['cod']);
+
+                if ($codeKey === '') {
+                    continue;
+                }
+
+                if (array_key_exists($codeKey, $mergedRows)) {
+                    $mergedRows[$codeKey] = $this->mergeRows($mergedRows[$codeKey], $normalizedRow);
+                } else {
+                    $mergedRows[$codeKey] = $normalizedRow;
+                }
+
+                foreach (array_keys($normalizedRow['maquinas']) as $machineColumn) {
+                    $detectedMachineColumns[$machineColumn] = $machineColumn;
+                }
+            }
+        }
+
+        $this->parsedRows = array_values($mergedRows);
+        usort($this->parsedRows, fn (array $left, array $right): int => strcmp($left['producto'], $right['producto']));
+
+        if ($this->parsedRows === []) {
+            throw ValidationException::withMessages([
+                'photos' => 'No se detectaron filas válidas en la planilla de surtido.',
+            ]);
+        }
+
+        $this->machineColumns = array_values($detectedMachineColumns);
+        natcasesort($this->machineColumns);
+        $this->machineColumns = array_values($this->machineColumns);
+        $this->sheetRouteName = $detectedRoute;
+        $this->sheetOperatorName = $detectedOperator;
+
+        $matchedProducts = collect($this->parsedRows)
+            ->filter(fn (array $row): bool => isset($this->productCatalog[$this->normalizeProductCode($row['cod'])]))
+            ->count();
+
+        $matchedMachines = collect($this->machineColumns)
+            ->filter(fn (string $column): bool => isset($this->routeMachines[$this->normalizeMachineCode($column)]))
+            ->count();
+
+        $this->summaryMessage = 'Planilla procesada con '.implode(' + ', array_values($providersUsed))
+            .'. Filas detectadas: '.count($this->parsedRows)
+            .". Productos reconocidos: {$matchedProducts}."
+            ." Máquinas de la ruta reconocidas: {$matchedMachines}.";
+
+        $this->dispatch(
+            'driver-stocking-photo-imported',
+            rows: $this->buildRowsForBrowser(),
+            machineColumns: $this->machineColumns,
+            sheetRouteName: $this->sheetRouteName,
+            sheetOperatorName: $this->sheetOperatorName,
+        );
+
+        $this->dispatchProgress(100, 'Planilla de surtido lista para aplicar a la máquina seleccionada.');
+        $this->dispatchToast('success', 'La planilla quedó lista. Selecciona una máquina de la ruta para aplicar sus cantidades.');
     }
 }

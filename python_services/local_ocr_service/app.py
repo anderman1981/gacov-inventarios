@@ -5,16 +5,31 @@ import io
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 
 app = FastAPI(title="GACOV Local OCR Service", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "LOCAL_OCR_ALLOWED_ORIGINS",
+            "http://127.0.0.1:9119,http://localhost:9119,http://127.0.0.1:8000,http://localhost:8000",
+        ).split(",")
+        if origin.strip() != ""
+    ],
+    allow_methods=["GET", "POST"],  # GET para /health, POST para /ocr/stocking-sheet
+    allow_headers=["Content-Type"],
+)
 
 
 class ProductCatalogItem(BaseModel):
@@ -73,16 +88,34 @@ def decode_image(image_base64: str) -> Image.Image:
 def preprocess_image(image: Image.Image) -> Image.Image:
     grayscale = ImageOps.grayscale(image)
     enhanced = ImageOps.autocontrast(grayscale)
-    enhanced = ImageEnhance.Contrast(enhanced).enhance(1.6)
+    enhanced = ImageEnhance.Contrast(enhanced).enhance(1.35)
     enhanced = enhanced.filter(ImageFilter.SHARPEN)
 
     width, height = enhanced.size
-    return enhanced.resize((width * 2, height * 2))
+
+    # Avoid sending oversized images to Ollama vision models; the previous
+    # unconditional upscale made inference much heavier and caused timeouts.
+    max_side = max(width, height)
+    target_max_side = max(960, int(os.getenv("LOCAL_OCR_IMAGE_MAX_SIDE", "1280")))
+
+    if max_side > target_max_side:
+        scale = target_max_side / max_side
+        enhanced = enhanced.resize(
+            (max(1, int(width * scale)), max(1, int(height * scale))),
+            Image.LANCZOS,
+        )
+
+    return enhanced
 
 
-def image_to_base64_png(image: Image.Image) -> str:
+def image_to_base64_jpeg(image: Image.Image) -> str:
     buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
+    image.save(
+        buffer,
+        format="JPEG",
+        quality=max(50, min(92, int(os.getenv("LOCAL_OCR_IMAGE_QUALITY", "78")))),
+        optimize=True,
+    )
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
@@ -92,6 +125,10 @@ def ollama_host() -> str:
 
 def ollama_model() -> str:
     return os.getenv("OLLAMA_MODEL", "").strip()
+
+
+def ollama_timeout() -> int:
+    return max(60, int(os.getenv("LOCAL_OCR_OLLAMA_TIMEOUT", "300")))
 
 
 def build_stocking_prompt(request: StockingSheetRequest) -> str:
@@ -163,7 +200,10 @@ def call_ollama_stocking(request: StockingSheetRequest, image: Image.Image) -> d
         "prompt": build_stocking_prompt(request),
         "stream": False,
         "format": "json",
-        "images": [image_to_base64_png(preprocess_image(image))],
+        "images": [image_to_base64_jpeg(preprocess_image(image))],
+        "options": {
+            "temperature": 0,
+        },
     }
 
     endpoint = f"{ollama_host()}/api/generate"
@@ -175,7 +215,7 @@ def call_ollama_stocking(request: StockingSheetRequest, image: Image.Image) -> d
     )
 
     try:
-        with urllib.request.urlopen(http_request, timeout=180) as response:
+        with urllib.request.urlopen(http_request, timeout=ollama_timeout()) as response:
             body = response.read().decode("utf-8")
     except urllib.error.URLError as exc:
         raise HTTPException(
@@ -249,16 +289,18 @@ def validate_stocking_payload(payload: dict[str, Any], request: StockingSheetReq
 
 @app.get("/health")
 def health() -> dict[str, Any]:
+    # No exponer detalles de la arquitectura interna (host, model, timeout)
+    model_configured = ollama_model() != ""
     return {
         "status": "ok",
         "backend": "ollama",
-        "ollama_host": ollama_host(),
-        "ollama_model": ollama_model() or None,
+        "model_configured": model_configured,
     }
 
 
 @app.post("/ocr/stocking-sheet", response_model=StockingSheetResponse)
 def ocr_stocking_sheet(request: StockingSheetRequest) -> StockingSheetResponse:
+    started_at = time.monotonic()
     image = decode_image(request.image_base64)
     payload = call_ollama_stocking(request, image)
     response = validate_stocking_payload(payload, request)

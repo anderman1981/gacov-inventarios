@@ -18,16 +18,141 @@
         uploadProgress: 0,
         uploadMessage: '',
         isProcessing: false,
+        localOcrEnabled: @js((bool) config('services.local_ocr.enabled', false)),
+        localOcrEndpoint: @js(rtrim((string) config('services.local_ocr.endpoint', 'http://127.0.0.1:8011'), '/')),
+        routeName: @js($routeName),
+        routeCode: @js($routeCode),
+        routeMachineCodes: @js(array_values(array_map(fn (array $machine): string => (string) $machine['code'], $routeMachines))),
+        productCatalogPayload: @js(array_values(array_map(
+            fn (array $product): array => ['code' => (string) $product['code'], 'name' => (string) $product['name']],
+            $productCatalog
+        ))),
         toasts: [],
         addToast(type, message) {
             const id = Date.now() + Math.random();
             this.toasts.push({ id, type, message });
             setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 5000);
+        },
+        readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = String(reader.result || '');
+                    const encoded = result.includes(',') ? result.split(',').pop() : result;
+                    if (!encoded) {
+                        reject(new Error('No fue posible leer una de las imágenes seleccionadas.'));
+                        return;
+                    }
+                    resolve(encoded);
+                };
+                reader.onerror = () => reject(new Error('No fue posible leer una de las imágenes seleccionadas.'));
+                reader.readAsDataURL(file);
+            });
+        },
+        extractProviderMessage(payload, fallback) {
+            if (typeof payload === 'string' && payload.trim() !== '') {
+                return payload.trim();
+            }
+
+            if (payload && typeof payload.detail === 'string' && payload.detail.trim() !== '') {
+                return payload.detail.trim();
+            }
+
+            if (payload && typeof payload.message === 'string' && payload.message.trim() !== '') {
+                return payload.message.trim();
+            }
+
+            return fallback;
+        },
+        async processWithLocalOcrDirect() {
+            const input = document.getElementById('driver-stocking-photo-upload');
+            const files = Array.from(input?.files ?? []);
+
+            if (files.length === 0) {
+                this.addToast('error', 'Selecciona al menos una imagen antes de procesar.');
+                return;
+            }
+
+            this.isProcessing = true;
+            this.uploadProgress = 8;
+            this.uploadMessage = 'Preparando OCR local...';
+
+            try {
+                const payloads = [];
+
+                for (let index = 0; index < files.length; index += 1) {
+                    const file = files[index];
+                    const imageBase64 = await this.readFileAsBase64(file);
+
+                    this.uploadProgress = Math.max(this.uploadProgress, 18 + (index * 18));
+                    this.uploadMessage = `Procesando planilla ${index + 1} de ${files.length} con OCR local...`;
+
+                    const response = await fetch(`${this.localOcrEndpoint}/ocr/stocking-sheet`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            image_base64: imageBase64,
+                            route_name: this.routeName,
+                            route_code: this.routeCode,
+                            route_machine_codes: this.routeMachineCodes,
+                            product_catalog: this.productCatalogPayload,
+                        }),
+                    });
+
+                    const responseText = await response.text();
+                    let decoded = null;
+
+                    try {
+                        decoded = responseText ? JSON.parse(responseText) : null;
+                    } catch (error) {
+                        decoded = null;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(this.extractProviderMessage(decoded, 'El OCR local devolvió un error al intentar procesar la planilla.'));
+                    }
+
+                    payloads.push(decoded);
+                    this.uploadProgress = Math.max(this.uploadProgress, 42 + (index * 18));
+                    this.uploadMessage = `Planilla ${index + 1} lista. Consolidando resultado...`;
+                }
+
+                this.uploadProgress = 92;
+                this.uploadMessage = 'Aplicando resultado del OCR local en el sistema...';
+                await $wire.acceptClientOcrPayloads(payloads, 'OCR local');
+            } catch (error) {
+                const message = error instanceof Error && error.message
+                    ? error.message
+                    : 'No fue posible procesar la planilla con OCR local.';
+
+                this.uploadProgress = 0;
+                this.uploadMessage = '';
+                this.isProcessing = false;
+                await $wire.reportClientOcrError(message);
+            }
+        },
+        async handleProcessClick() {
+            if (this.isProcessing) {
+                return;
+            }
+
+            if (this.localOcrEnabled) {
+                await this.processWithLocalOcrDirect();
+                return;
+            }
+
+            this.isProcessing = true;
+            this.uploadProgress = Math.max(this.uploadProgress, 15);
+            this.uploadMessage = 'Procesando con IA...';
+            await $wire.uploadAndProcessPhoto();
         }
     }"
-    x-on:livewire-upload-start="isProcessing=true;uploadProgress=8;uploadMessage='Subiendo planilla...'"
-    x-on:livewire-upload-progress="isProcessing=true;uploadProgress=Math.max(uploadProgress,$event.detail.progress);uploadMessage='Subiendo planilla...'"
-    x-on:livewire-upload-finish="isProcessing=true;uploadProgress=Math.max(uploadProgress,30);uploadMessage='Procesando con IA...'"
+    x-on:livewire-upload-start="isProcessing=true;uploadProgress=8;uploadMessage='Subiendo imágenes...'"
+    x-on:livewire-upload-progress="isProcessing=true;uploadProgress=Math.max(uploadProgress,$event.detail.progress);uploadMessage='Subiendo imágenes...'"
+    x-on:livewire-upload-finish="isProcessing=false;uploadProgress=Math.max(uploadProgress,24);uploadMessage='Imágenes listas para procesar.'"
     x-on:livewire-upload-error="isProcessing=false;uploadProgress=0;uploadMessage='';addToast('error','No fue posible subir las imágenes.')"
     x-on:driver-stocking-photo-progress.window="isProcessing=true;uploadProgress=Math.max(uploadProgress,$event.detail.progress);uploadMessage=$event.detail.message"
     x-on:driver-stocking-photo-toast.window="addToast($event.detail.type,$event.detail.message);if($event.detail.type==='success'){uploadProgress=100;uploadMessage='Planilla procesada.';isProcessing=false;}if($event.detail.type==='error'){uploadProgress=0;isProcessing=false;}"
@@ -340,13 +465,12 @@
                 <div style="display:flex;gap:var(--space-3);margin-top:var(--space-4);flex-wrap:wrap;align-items:center">
                     <button
                         type="button"
-                        wire:click="uploadAndProcessPhoto"
-                        wire:loading.attr="disabled"
-                        wire:target="uploadAndProcessPhoto,photos"
+                        @click="handleProcessClick()"
+                        :disabled="isProcessing"
+                        :style="isProcessing ? 'opacity:.6;cursor:not-allowed' : ''"
                         class="btn btn-primary"
                         style="width:auto">
-                        <span wire:loading.remove wire:target="uploadAndProcessPhoto">Procesar planilla con IA</span>
-                        <span wire:loading wire:target="uploadAndProcessPhoto">Procesando...</span>
+                        <span x-text="isProcessing ? 'Procesando...' : (localOcrEnabled ? 'Procesar planilla local' : 'Procesar planilla con IA')"></span>
                     </button>
                     <button
                         type="button"

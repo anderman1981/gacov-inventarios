@@ -2,13 +2,20 @@
 @section('title', 'Inventario vehículo')
 
 @section('content')
-@php($routeQuery = $route?->id ? ['route_id' => $route->id] : [])
+@php
+    $routeQuery = $route?->id ? ['route_id' => $route->id] : [];
+@endphp
 <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
     <div>
         <h1 class="page-title">Inventario del vehículo</h1>
         <p class="page-subtitle">
-            @if($route) Ruta {{ $route->code }} — {{ $route->name }} @endif
-            @if($vehicleWarehouse) · {{ $vehicleWarehouse->name }} @endif
+            @if($route)
+                Ruta {{ $route->code }} — {{ $route->name }}
+            @endif
+
+            @if($vehicleWarehouse)
+                · {{ $vehicleWarehouse->name }}
+            @endif
         </p>
     </div>
     <a href="{{ route('driver.dashboard', $routeQuery) }}" class="btn" style="width:auto;background:var(--gacov-bg-elevated);color:var(--gacov-text-primary)">
@@ -62,31 +69,43 @@
         </thead>
         <tbody>
             @foreach($stocks as $stock)
+            @php
+                $category = $stock->product->category;
+                $stockQuantity = (float) $stock->quantity;
+                $categoryBadgeClass = match ($category) {
+                    'snacks' => 'badge-info',
+                    'bebidas_frias' => 'badge-neutral',
+                    default => 'badge-warning',
+                };
+                $stockLevelColor = match (true) {
+                    $stockQuantity < 5 => 'var(--gacov-error)',
+                    $stockQuantity < 15 => 'var(--gacov-warning)',
+                    default => 'var(--gacov-success)',
+                };
+                [$stockStatusBadgeClass, $stockStatusLabel] = match (true) {
+                    $stockQuantity < 5 => ['badge-error', 'Agotándose'],
+                    $stockQuantity < 15 => ['badge-warning', 'Stock bajo'],
+                    default => ['badge-success', 'OK'],
+                };
+            @endphp
             <tr>
                 <td>
                     <strong>{{ $stock->product->name }}</strong>
                     <div style="font-size:11px;color:var(--gacov-text-muted)">{{ $stock->product->sku }}</div>
                 </td>
                 <td>
-                    @php $cat = $stock->product->category; @endphp
-                    <span class="badge {{ $cat === 'snacks' ? 'badge-info' : ($cat === 'bebidas_frias' ? 'badge-neutral' : 'badge-warning') }}">
-                        {{ str_replace('_',' ', $cat) }}
+                    <span class="badge {{ $categoryBadgeClass }}">
+                        {{ str_replace('_', ' ', $category) }}
                     </span>
                 </td>
                 <td style="color:var(--gacov-text-muted)">{{ $stock->product->unit }}</td>
                 <td style="text-align:center">
-                    <span style="font-weight:700;font-size:18px;color:{{ $stock->quantity < 5 ? 'var(--gacov-error)' : ($stock->quantity < 15 ? 'var(--gacov-warning)' : 'var(--gacov-success)') }}">
-                        {{ number_format((float) $stock->quantity, 0, ',', '.') }}
+                    <span style="font-weight:700;font-size:18px;color:{{ $stockLevelColor }}">
+                        {{ number_format($stockQuantity, 0, ',', '.') }}
                     </span>
                 </td>
                 <td>
-                    @if($stock->quantity < 5)
-                        <span class="badge badge-error">Agotándose</span>
-                    @elseif($stock->quantity < 15)
-                        <span class="badge badge-warning">Stock bajo</span>
-                    @else
-                        <span class="badge badge-success">OK</span>
-                    @endif
+                    <span class="badge {{ $stockStatusBadgeClass }}">{{ $stockStatusLabel }}</span>
                 </td>
             </tr>
             @endforeach

@@ -1,14 +1,21 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class StockMovement extends Model
+final class StockMovement extends Model
 {
-    public $timestamps = false;
-    const CREATED_AT = 'created_at';
+    use BelongsToTenant;
+
+    // Registro inmutable de auditoría: solo created_at, sin updated_at
+    public const CREATED_AT = 'created_at';
+
+    public const UPDATED_AT = null;
 
     protected $fillable = [
         'movement_type', 'origin_warehouse_id', 'destination_warehouse_id',
@@ -19,8 +26,8 @@ class StockMovement extends Model
     protected function casts(): array
     {
         return [
-            'quantity'   => 'integer',
-            'unit_cost'  => 'decimal:2',
+            'quantity' => 'integer',
+            'unit_cost' => 'decimal:2',
             'created_at' => 'datetime',
         ];
     }

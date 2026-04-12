@@ -1,12 +1,18 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class TransferOrderItem extends Model
 {
+    use BelongsToTenant, HasFactory;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -21,9 +27,9 @@ final class TransferOrderItem extends Model
     protected function casts(): array
     {
         return [
-            'quantity_requested'  => 'integer',
+            'quantity_requested' => 'integer',
             'quantity_dispatched' => 'integer',
-            'quantity_received'   => 'integer',
+            'quantity_received' => 'integer',
         ];
     }
 

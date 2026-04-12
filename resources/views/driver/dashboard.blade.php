@@ -16,14 +16,18 @@
         </p>
     </div>
     <div class="driver-header-actions">
+        @moduleEnabled('drivers')
         <a href="{{ route('driver.stocking.create', $routeQuery) }}" class="btn btn-primary" style="width:auto">
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
             Surtir máquina
         </a>
+        @endmoduleEnabled
+        @moduleEnabled('sales')
         <a href="{{ route('driver.sales.create', $routeQuery) }}" class="btn" style="background:var(--gacov-bg-elevated);color:var(--gacov-text-primary);width:auto">
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
             Registrar venta
         </a>
+        @endmoduleEnabled
     </div>
 </div>
 
@@ -49,18 +53,24 @@
 @endif
 
 <div class="driver-quick-grid">
+    @moduleEnabled('drivers')
     <a href="{{ route('driver.stocking.create', $routeQuery) }}" class="driver-quick-card">
         <div class="driver-quick-title">Surtido</div>
         <div class="driver-quick-copy">Cargar planilla o surtir una máquina de la ruta.</div>
     </a>
+    @endmoduleEnabled
+    @moduleEnabled('sales')
     <a href="{{ route('driver.sales.create', $routeQuery) }}" class="driver-quick-card">
         <div class="driver-quick-title">Ventas</div>
         <div class="driver-quick-copy">Registrar ventas desde la máquina seleccionada.</div>
     </a>
+    @endmoduleEnabled
+    @moduleEnabled('inventory')
     <a href="{{ route('driver.inventory', $routeQuery) }}" class="driver-quick-card">
         <div class="driver-quick-title">Vehículo</div>
         <div class="driver-quick-copy">Consultar inventario disponible en el vehículo.</div>
     </a>
+    @endmoduleEnabled
 </div>
 
 {{-- KPIs del día --}}
@@ -99,9 +109,11 @@
 <div class="panel">
     <div class="panel-header">
         <span class="panel-title">Máquinas de mi ruta</span>
+        @moduleEnabled('inventory')
         <a href="{{ route('driver.inventory', $routeQuery) }}" style="font-size:13px;color:var(--gacov-primary);text-decoration:none">
             Ver inventario vehículo →
         </a>
+        @endmoduleEnabled
     </div>
 
     @if($machines->isNotEmpty())
@@ -142,17 +154,21 @@
                 </td>
                 <td>
                     <div style="display:flex;gap:var(--space-2)">
+                        @moduleEnabled('drivers')
                         @php($stockingParams = array_merge($routeQuery, ['machine_id' => $machine->id]))
                         <a
                            href="{{ route('driver.stocking.create', $stockingParams) }}"
                            style="padding:4px 10px;background:rgba(0,212,255,.1);color:var(--gacov-primary);border-radius:var(--radius-sm);font-size:12px;text-decoration:none">
                             Surtir
                         </a>
+                        @endmoduleEnabled
+                        @moduleEnabled('sales')
                         @php($salesParams = array_merge($routeQuery, ['machine_id' => $machine->id]))
                         <a href="{{ route('driver.sales.create', $salesParams) }}"
                            style="padding:4px 10px;background:rgba(16,185,129,.1);color:var(--gacov-success);border-radius:var(--radius-sm);font-size:12px;text-decoration:none">
                             Venta
                         </a>
+                        @endmoduleEnabled
                     </div>
                 </td>
             </tr>

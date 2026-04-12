@@ -185,7 +185,7 @@ PROMPT;
                 $this->extendExecutionWindow();
                 $this->dispatchProgress(
                     20 + ($index * 20),
-                    "Analizando foto " . ($index + 1) . " de " . count($this->photos) . " con IA..."
+                    'Analizando foto '.($index + 1).' de '.count($this->photos).' con IA...'
                 );
 
                 $result = $this->processWithAvailableProviders($photo, $index + 1, count($this->photos));
@@ -206,6 +206,7 @@ PROMPT;
 
                     if (array_key_exists($codeKey, $mergedRows)) {
                         $mergedRows[$codeKey] = $this->mergeRows($mergedRows[$codeKey], $normalizedRow);
+
                         continue;
                     }
 
@@ -240,8 +241,8 @@ PROMPT;
             $this->applyRowsToTransfer('sb', true);
             $this->lastProviderUsed = $this->buildProviderSummary(array_values($providersUsed), $fallbackUsed);
 
-            $this->summaryMessage = "La IA detectó " . count($this->parsedRows) . " fila(s) con {$this->lastProviderUsed}. "
-                . "{$matchedCodes} código(s) coinciden con el catálogo activo. La columna SB se aplicó automáticamente al traslado.";
+            $this->summaryMessage = 'La IA detectó '.count($this->parsedRows)." fila(s) con {$this->lastProviderUsed}. "
+                ."{$matchedCodes} código(s) coinciden con el catálogo activo. La columna SB se aplicó automáticamente al traslado.";
 
             $this->dispatchProgress(100, 'Planilla procesada correctamente.');
             $this->dispatchToast('success', "La planilla fue transcrita con {$this->lastProviderUsed} y la columna SB ya quedó cargada en el traslado.");
@@ -288,7 +289,7 @@ PROMPT;
             $this->editingRowIndex = null;
         }
 
-        $this->summaryMessage = "Fila eliminada de la previsualización.";
+        $this->summaryMessage = 'Fila eliminada de la previsualización.';
         $this->dispatchToast('success', 'La fila fue eliminada de la tabla.');
     }
 
@@ -417,6 +418,7 @@ PROMPT;
 
                 if ($this->shouldRetryGeminiWithNextModel($response->status(), $message, $index, count($models))) {
                     $lastException = new RuntimeException($friendlyMessage);
+
                     continue;
                 }
 
@@ -469,7 +471,7 @@ PROMPT;
                     'fallback_used' => count($attemptErrors) > 0,
                 ];
             } catch (Throwable $exception) {
-                $attemptErrors[] = $this->providerDisplayName($provider) . ': ' . $this->friendlyExceptionMessage($provider, $exception);
+                $attemptErrors[] = $this->providerDisplayName($provider).': '.$this->friendlyExceptionMessage($provider, $exception);
 
                 Log::warning('transfer_photo_import_provider_failed', [
                     'user_id' => auth()->id(),
@@ -515,7 +517,7 @@ PROMPT;
             throw new RuntimeException('No fue posible leer una de las imágenes seleccionadas.');
         }
 
-        $imageDataUrl = 'data:' . $mimeType . ';base64,' . base64_encode($binary);
+        $imageDataUrl = 'data:'.$mimeType.';base64,'.base64_encode($binary);
 
         $response = Http::acceptJson()
             ->connectTimeout($connectTimeout)
@@ -865,8 +867,8 @@ PROMPT;
     private function buildUnavailableProvidersMessage(array $attemptErrors): string
     {
         return 'No fue posible procesar la planilla en este momento. '
-            . implode(' ', array_values(array_unique(array_filter($attemptErrors))))
-            . ' Puedes reintentar en unos minutos o revisar la configuración y cuota de los proveedores.';
+            .implode(' ', array_values(array_unique(array_filter($attemptErrors))))
+            .' Puedes reintentar en unos minutos o revisar la configuración y cuota de los proveedores.';
     }
 
     /**
@@ -881,7 +883,7 @@ PROMPT;
         }
 
         if ($fallbackUsed && count($providersUsed) > 1) {
-            return implode(' + ', $providersUsed) . ' como respaldo';
+            return implode(' + ', $providersUsed).' como respaldo';
         }
 
         return implode(' + ', $providersUsed);
@@ -908,6 +910,7 @@ PROMPT;
 
             if ($catalogProduct === null) {
                 $missingCodes[] = $code;
+
                 continue;
             }
 
@@ -943,13 +946,13 @@ PROMPT;
 
         $this->dispatch('transfer-photo-import-applied', rows: $appliedRows, missingCodes: $missingCodes);
 
-        $message = count($appliedRows) . " producto(s) aplicado(s) al formulario desde la columna {$quantityColumn}.";
+        $message = count($appliedRows)." producto(s) aplicado(s) al formulario desde la columna {$quantityColumn}.";
         if ($missingCodes !== []) {
-            $message .= ' Códigos no encontrados: ' . implode(', ', array_slice($missingCodes, 0, 6));
+            $message .= ' Códigos no encontrados: '.implode(', ', array_slice($missingCodes, 0, 6));
         }
 
         $this->summaryMessage = $automatic
-            ? $message . ' Aplicación automática completada.'
+            ? $message.' Aplicación automática completada.'
             : $message;
 
         if (! $automatic) {

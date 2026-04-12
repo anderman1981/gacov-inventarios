@@ -1,10 +1,14 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-return new class extends Migration {
-    public function up(): void {
+
+return new class extends Migration
+{
+    public function up(): void
+    {
         Schema::table('users', function (Blueprint $table) {
             $table->string('phone', 20)->nullable()->after('email');
             $table->boolean('is_active')->default(true)->after('phone');
@@ -13,10 +17,12 @@ return new class extends Migration {
             $table->foreignId('route_id')->nullable()->after('last_login_at')->constrained('routes')->nullOnDelete();
         });
     }
-    public function down(): void {
+
+    public function down(): void
+    {
         Schema::table('users', function (Blueprint $table) {
             $table->dropForeign(['route_id']);
-            $table->dropColumn(['phone','is_active','must_change_password','last_login_at','route_id']);
+            $table->dropColumn(['phone', 'is_active', 'must_change_password', 'last_login_at', 'route_id']);
         });
     }
 };

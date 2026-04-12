@@ -1,0 +1,42 @@
+{
+  "name": "GACOV Inventarios - Knowledge Base",
+  "version": "1.2.0",
+  "created_at": "2026-04-12",
+  "updated_at": "2026-04-12T09:27:00Z",
+  "description": "Sistema RAG para documentar aprendizajes y soluciones del proyecto GACOV Inventarios",
+  "public_routes": {
+    "/admin/modules": "Página de módulos activos del cliente con descripciones detalladas"
+  },
+  "commands": {
+    "permissions:sync": "Sincroniza permisos con roles (--check para verificar, --fresh para limpiar cache)",
+    "modules:reset-phase": "Resetea módulos de un tenant según fase"
+  },
+  "categories": [
+    {
+      "name": "problemas",
+      "path": "problemas/",
+      "description": "Problemas conocidos y sus soluciones"
+    },
+    {
+      "name": "arquitectura",
+      "path": "arquitectura/",
+      "description": "Documentación de la arquitectura del sistema"
+    },
+    {
+      "name": "middlewares",
+      "path": "middlewares/",
+      "description": "Documentación de middlewares personalizados"
+    },
+    {
+      "name": "patrones",
+      "path": "patrones/",
+      "description": "Patrones de diseño utilizados"
+    },
+    {
+      "name": "errores",
+      "path": "errores/",
+      "description": "Catálogo de errores HTTP y sus soluciones"
+    }
+  ],
+  "last_updated": "2026-04-12T09:27:00Z"
+}

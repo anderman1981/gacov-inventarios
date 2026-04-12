@@ -14,7 +14,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
-use RuntimeException;
 use Throwable;
 
 final class ImportMachinesHandler
@@ -39,7 +38,7 @@ final class ImportMachinesHandler
         ]);
 
         try {
-            $reader = new MachineCatalogImport();
+            $reader = new MachineCatalogImport;
             Excel::import($reader, $file);
 
             [$processed, $errors, $totalRows] = $this->processRows($reader->rows());
@@ -91,16 +90,19 @@ final class ImportMachinesHandler
 
                 if ($machineCode === '') {
                     $errors[] = "Fila {$rowNumber}: el código de la máquina es obligatorio.";
+
                     continue;
                 }
 
                 if ($machineName === '') {
                     $errors[] = "Fila {$rowNumber}: el nombre de la máquina es obligatorio.";
+
                     continue;
                 }
 
                 if ($machineType === null) {
                     $errors[] = "Fila {$rowNumber}: el tipo debe ser vending_cafe, vending_snack, vending_bebida o mixta.";
+
                     continue;
                 }
 
@@ -110,6 +112,7 @@ final class ImportMachinesHandler
 
                     if (! $route instanceof Route) {
                         $errors[] = "Fila {$rowNumber}: no existe una ruta con código {$routeCode}.";
+
                         continue;
                     }
 
@@ -122,6 +125,7 @@ final class ImportMachinesHandler
 
                     if (! $operator instanceof User) {
                         $errors[] = "Fila {$rowNumber}: no existe un usuario con email {$operatorEmail}.";
+
                         continue;
                     }
 
@@ -147,7 +151,7 @@ final class ImportMachinesHandler
                         'type' => 'maquina',
                     ],
                     [
-                        'name' => 'Bodega ' . $machine->name,
+                        'name' => 'Bodega '.$machine->name,
                         'code' => $machine->code,
                         'route_id' => $machine->route_id,
                         'is_active' => $machine->is_active,
