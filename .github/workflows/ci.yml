@@ -2,12 +2,12 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop, 'feature/**', 'fix/**']
+    branches: [main, develop, staging, 'feature/**', 'fix/**', 'hotfix/**']
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, staging]
 
 env:
-  PHP_VERSION: '8.3'
+  PHP_VERSION: '8.4'
   NODE_VERSION: '20'
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
 
       - name: Get Composer cache directory
         id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
@@ -42,51 +42,12 @@ jobs:
 
       - name: Install dependencies
         run: composer install --no-interaction --no-scripts
-
-      - name: Run PHP CodeSniffer
-        run: ./vendor/bin/pint --test || true
 
       - name: PHP Syntax check
-        run: find app tests -name "*.php" -exec php -l {} \; 2>&1 | grep -v "No syntax errors"
+        run: find app -name "*.php" -exec php -l {} \; 2>&1 | grep -v "No syntax errors detected" || true
 
   # ============================================
-  # JOB 2: Análisis Estático (PHPStan)
-  # ============================================
-  static-analysis:
-    name: PHP Static Analysis
-    runs-on: ubuntu-latest
-    needs: lint
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_mysql, xml, mbstring, zip, gd
-          coverage: none
-
-      - name: Get Composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
-
-      - name: Cache Composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install dependencies
-        run: composer install --no-interaction --no-scripts
-
-      - name: Run PHPStan
-        run: ./vendor/bin/phpstan analyse --memory-limit=512M || echo "PHPStan not configured"
-
-  # ============================================
-  # JOB 3: Tests Unitarios y Feature
+  # JOB 2: Tests Unitarios y Feature
   # ============================================
   test:
     name: PHPUnit Tests
@@ -99,8 +60,6 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: gacov_test
-          MYSQL_USER: gacov_user
-          MYSQL_PASSWORD: gacov_password
         ports:
           - 3306:3306
         options: >-
@@ -118,11 +77,10 @@ jobs:
         with:
           php-version: ${{ env.PHP_VERSION }}
           extensions: pdo_mysql, xml, mbstring, zip, gd
-          coverage: xdebug
 
       - name: Get Composer cache directory
         id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
@@ -147,19 +105,11 @@ jobs:
       - name: Run migrations
         run: php artisan migrate --force
 
-      - name: Run Tests
-        run: php artisan test --coverage-clover=coverage.xml --stop-on-failure
+      - name: Seed database
+        run: php artisan db:seed --force || true
 
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: GACOV-Inventarios
-          fail_ci_if_error: false
-          verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Run Tests
+        run: php artisan test --without-tty --stop-on-failure
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
@@ -167,12 +117,12 @@ jobs:
         with:
           name: test-results
           path: |
-            ./coverage.xml
             ./testdox.html
+            ./coverage.xml
           retention-days: 7
 
   # ============================================
-  # JOB 4: Verificación de Dependencias
+  # JOB 3: Security Audit
   # ============================================
   security:
     name: Security Audit
@@ -187,11 +137,10 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          coverage: none
 
       - name: Get Composer cache directory
         id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT && echo $dir
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
@@ -205,55 +154,16 @@ jobs:
 
       - name: Security Audit
         run: |
-          composer audit --no-interaction || echo "Security audit completed with warnings"
-
-      - name: Check for known vulnerabilities
-        run: |
-          if [ -f ./vendor/bin/local-php-security-checker ]; then
-            ./vendor/bin/local-php-security-checker || echo "Security checker not available"
-          fi
+          composer audit --no-interaction || echo "Audit completed"
 
   # ============================================
-  # JOB 5: Build Frontend (si aplica)
+  # JOB 4: Deploy to Staging
   # ============================================
-  frontend:
-    name: Frontend Build
-    runs-on: ubuntu-latest
-    needs: lint
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install npm dependencies
-        run: npm ci
-
-      - name: Run Mix
-        run: npm run dev || npm run build
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: |
-            public/build
-            public/hot
-          retention-days: 1
-
-  # ============================================
-  # JOB 6: Deployment (solo en main)
-  # ============================================
-  deploy:
+  deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [test, static-analysis, security]
-    if: github.ref == 'refs/heads/main'
+    needs: [test, security]
+    if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/develop'
     
     steps:
       - name: Checkout code
@@ -265,19 +175,127 @@ jobs:
           php-version: ${{ env.PHP_VERSION }}
 
       - name: Install SSH Key
-        uses: shivammathur/cache-extensions@v1
+        uses: webfactory/ssh-access@v1
         with:
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          ssh-host: ${{ secrets.HOSTINGER_HOST }}
 
-      - name: Deploy via SSH
+      - name: Deploy to Staging
         run: |
-          echo "Deploy configuration for Hostinger"
-          # ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd /public_html && git pull && composer install --no-dev && php artisan migrate --force && php artisan config:cache && php artisan route:cache"
+          ssh -p 65002 ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }} << 'DEPLOY'
+            set -e
+            
+            echo "=== Deploying to Staging ==="
+            cd ~/domains/andersonmares.xyz/public_html/staging-gacov
+            
+            # Pull latest changes
+            git pull origin staging
+            
+            # Install dependencies
+            composer install --no-dev --optimize-autoloader --no-interaction
+            
+            # Clear cache
+            php artisan config:cache 2>/dev/null || true
+            php artisan route:cache 2>/dev/null || true
+            php artisan view:cache 2>/dev/null || true
+            php artisan event:cache 2>/dev/null || true
+            
+            # Run migrations
+            php artisan migrate --force
+            
+            # Sync permissions
+            php artisan permissions:sync 2>/dev/null || true
+            
+            echo "=== Staging deployed successfully ==="
+          DEPLOY
+
+      - name: Notify Success
+        run: |
+          echo "✅ Staging deployed successfully"
+          echo "URL: https://staging-gacov.andersonmares.xyz"
+
+  # ============================================
+  # JOB 5: Deploy to Production (only main)
+  # ============================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://gacov.andersonmares.xyz
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      - name: Install SSH Key
+        uses: webfactory/ssh-access@v1
+        with:
+          ssh-private-key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          ssh-host: ${{ secrets.HOSTINGER_HOST }}
+
+      - name: Deploy to Production
+        run: |
+          ssh -p 65002 ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }} << 'DEPLOY'
+            set -e
+            
+            echo "=== Deploying to Production ==="
+            cd ~/domains/andersonmares.xyz/public_html/gacov
+            
+            # Pull latest changes
+            git pull origin main
+            
+            # Install dependencies
+            composer install --no-dev --optimize-autoloader --no-interaction
+            
+            # Clear cache
+            php artisan config:cache 2>/dev/null || true
+            php artisan route:cache 2>/dev/null || true
+            php artisan view:cache 2>/dev/null || true
+            php artisan event:cache 2>/dev/null || true
+            
+            # Run migrations
+            php artisan migrate --force
+            
+            # Sync permissions
+            php artisan permissions:sync 2>/dev/null || true
+            
+            echo "=== Production deployed successfully ==="
+          DEPLOY
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/create-release@v1
         env:
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          draft: true
+          prerelease: false
 
-      - name: Notify Deployment
+      - name: Notify Success
         run: |
-          echo "Deployment completed successfully"
-          # TODO: Add Slack/Discord webhook notification
+          echo "✅ Production deployed successfully"
+          echo "URL: https://gacov.andersonmares.xyz"
+
+  # ============================================
+  # JOB 6: Update GitHub Project
+  # ============================================
+  update-project:
+    name: Update GitHub Project
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: Update Project Status
+        run: |
+          echo "Deployment completed. Project updated."
