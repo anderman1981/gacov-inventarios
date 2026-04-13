@@ -79,6 +79,10 @@ final class RoleSeeder extends Seeder
             // Dashboard
             'dashboard.full',       // KPIs completos
             'dashboard.own',        // solo vista de su ruta
+
+            // Vehículo (conductor)
+            'vehicle.view',
+            'vehicle.inventory.view',
         ];
 
         foreach ($permissions as $perm) {
@@ -126,12 +130,16 @@ final class RoleSeeder extends Seeder
             ],
 
             'conductor' => [
-                'machines.view',
-                'inventory.view',
-                'transfers.view',
+                // Solo productos (no ve bodega principal)
+                'products.view',
+                // Solo su propio surtido y ventas
                 'stockings.view', 'stockings.create', 'stockings.own',
                 'sales.view', 'sales.create', 'sales.own',
+                // Dashboard personalizado
                 'dashboard.own',
+                // Vehículo (no ve todas las máquinas ni bodega principal)
+                'vehicle.view',
+                'vehicle.inventory.view',
             ],
         ];
 

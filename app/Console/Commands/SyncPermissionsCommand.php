@@ -74,6 +74,9 @@ final class SyncPermissionsCommand extends Command
             // Dashboard
             'dashboard.full',
             'dashboard.own',
+            // Vehículo (conductor)
+            'vehicle.view',
+            'vehicle.inventory.view',
         ];
 
         $rolePermissions = [
@@ -115,12 +118,16 @@ final class SyncPermissionsCommand extends Command
             ],
 
             'conductor' => [
-                'machines.view',
-                'inventory.view',
-                'transfers.view',
+                // Solo productos (no ve bodega principal)
+                'products.view',
+                // Solo su propio surtido y ventas
                 'stockings.view', 'stockings.create', 'stockings.own',
                 'sales.view', 'sales.create', 'sales.own',
+                // Dashboard personalizado
                 'dashboard.own',
+                // Vehículo (no ve todas las máquinas ni bodega principal)
+                'vehicle.view',
+                'vehicle.inventory.view',
             ],
         ];
 
@@ -129,7 +136,7 @@ final class SyncPermissionsCommand extends Command
         $missingPermissions = array_diff($permissions, $existingPermissions);
 
         if (! empty($missingPermissions)) {
-            $this->warn('Permisos faltantes: ' . implode(', ', $missingPermissions));
+            $this->warn('Permisos faltantes: '.implode(', ', $missingPermissions));
             $this->info('Ejecuta: php artisan db:seed --class=RoleSeeder');
         }
 
@@ -139,6 +146,7 @@ final class SyncPermissionsCommand extends Command
                 ['Rol', 'Permisos Asignados'],
                 collect($rolePermissions)->map(fn ($perms, $role) => [$role, count($perms)])->toArray()
             );
+
             return Command::SUCCESS;
         }
 
@@ -148,7 +156,7 @@ final class SyncPermissionsCommand extends Command
         foreach ($rolePermissions as $roleName => $perms) {
             $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
             $role->syncPermissions($perms);
-            $this->line("  ✅ {$roleName}: " . count($perms) . ' permisos');
+            $this->line("  ✅ {$roleName}: ".count($perms).' permisos');
         }
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();

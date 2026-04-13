@@ -37,7 +37,7 @@ final class RequireModuleAccess
 
     /**
      * Verifica si el usuario tiene el permiso de ver el módulo.
-     * El permiso sigue el formato: {module_key}.view
+     * El permiso sigue el formato: {module_key}.view o {module_key}.own
      */
     private function userHasModulePermission(string $moduleKey): bool
     {
@@ -52,8 +52,14 @@ final class RequireModuleAccess
             return true;
         }
 
-        // Verificar permiso específico del módulo
+        // Verificar permiso específico del módulo (view o own para dashboard personalizado)
         $permission = "{$moduleKey}.view";
+        $ownPermission = "{$moduleKey}.own";
+
+        // Dashboard permite tanto view como own (dashboard personalizado del conductor)
+        if ($moduleKey === 'dashboard') {
+            return $user->hasPermissionTo($permission) || $user->hasPermissionTo($ownPermission);
+        }
 
         return $user->hasPermissionTo($permission);
     }

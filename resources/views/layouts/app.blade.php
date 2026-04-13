@@ -241,17 +241,23 @@
                     <span class="nav-sub-dot"></span> Productos
                 </a>
                 @endmoduleEnabled
+                @can('inventory.view')
                 <a href="{{ route('inventory.warehouse') }}" class="nav-sub-item {{ ($route === 'inventory.warehouse' || str_starts_with($route,'inventory.adjust') || str_starts_with($route,'inventory.import')) ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Bodega Principal
                 </a>
+                @endcan
+                @can('inventory.view')
                 <a href="{{ route('inventory.vehicles') }}" class="nav-sub-item {{ $route === 'inventory.vehicles' ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Vehículos
                 </a>
+                @endcan
+                @can('machines.view')
                 @moduleEnabled('machines')
                 <a href="{{ route('inventory.machines') }}" class="nav-sub-item {{ $route === 'inventory.machines' ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Máquinas
                 </a>
                 @endmoduleEnabled
+                @endcan
             </div>
             @endif
             @endmoduleEnabled
@@ -259,12 +265,14 @@
             {{-- Rutas y Máquinas --}}
             <div class="nav-section">Operaciones</div>
 
+            @can('transfers.view')
             @moduleEnabled('transfers')
             <a href="{{ route('transfers.index') }}" class="nav-item {{ str_starts_with($route,'transfers') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 5a1 1 0 100 2h5.586l-1.293 1.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L13.586 5H8zM12 15a1 1 0 100-2H6.414l1.293-1.293a1 1 0 10-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L6.414 15H12z"/></svg>
                 <span>Traslados</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
             @moduleEnabled('drivers')
             <a href="{{ route('driver.stocking.create') }}" class="nav-item {{ str_starts_with($route,'driver.stocking') ? 'active' : '' }}">
@@ -273,19 +281,23 @@
             </a>
             @endmoduleEnabled
 
+            @can('machines.view')
             @moduleEnabled('machines')
             <a href="{{ route('machines.index') }}" class="nav-item {{ str_starts_with($route,'machines') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
                 <span>Máquinas</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
+            @can('sales.view')
             @moduleEnabled('sales')
             <a href="{{ route('driver.sales.create') }}" class="nav-item {{ str_starts_with($route,'driver.sales') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
                 <span>Ventas Máquinas</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
             {{-- Reportes --}}
             <div class="nav-section">Reportes</div>
