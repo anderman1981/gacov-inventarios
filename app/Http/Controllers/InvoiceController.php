@@ -8,7 +8,7 @@ use App\Domain\Tenant\Services\TenantContext;
 use App\Http\Requests\InvoiceStoreRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
-use Illuminate\Http\JsonResponse;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -366,20 +366,25 @@ final class InvoiceController extends Controller
     /**
      * Generar y descargar PDF.
      */
-    public function downloadPdf(Invoice $invoice): JsonResponse
+    public function downloadPdf(Invoice $invoice)
     {
         $invoice->load(['items', 'tenant', 'creator']);
 
-        // Placeholder: en producción usar DomPDF
-        // $pdf = PdfFacade::loadView('invoices.pdf', compact('invoice'));
-
-        return response()->json([
-            'message' => 'PDF generation not yet implemented',
-            'invoice' => $invoice->full_number,
-            'endpoint' => route('invoices.show', $invoice),
+        // Generar PDF con DomPDF
+        $pdf = Pdf::loadView('invoices.pdf', [
+            'invoice' => $invoice,
         ]);
 
-        // return $pdf->download("factura-{$invoice->full_number}.pdf");
+        // Configurar PDF
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->setOptions([
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => false,
+            'defaultFont' => 'dejavu sans',
+        ]);
+
+        // Descargar PDF
+        return $pdf->download("factura-{$invoice->full_number}.pdf");
     }
 
     /**
