@@ -134,6 +134,11 @@ final class DriverController extends Controller
             return back()->withInput()->with('error', 'Debe ingresar al menos un producto con cantidad mayor a cero.');
         }
 
+        // Extraer datos de geolocalización
+        $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
+        $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
+        $geolocationAccuracy = $request->input('geolocation_accuracy');
+
         try {
             $this->registerStocking->handle(
                 user: $user,
@@ -143,6 +148,9 @@ final class DriverController extends Controller
                 machineWarehouse: $machineWarehouse,
                 items: $items,
                 notes: $request->input('notes'),
+                latitude: $latitude,
+                longitude: $longitude,
+                geolocationAccuracy: $geolocationAccuracy,
             );
         } catch (\RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -273,6 +281,8 @@ final class DriverController extends Controller
     {
         $user = auth()->user();
 
-        return (bool) ($user?->hasRole('super_admin') || $user?->can('machines.view'));
+        // Solo super_admin o admin/manager (roles con gestión global) pueden cambiar de ruta.
+        // Los conductores solo pueden ver su propia ruta asignada.
+        return (bool) ($user?->is_super_admin || $user?->hasAnyRole(['super_admin', 'admin', 'manager']));
     }
 }

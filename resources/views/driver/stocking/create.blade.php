@@ -1,6 +1,10 @@
 @extends('layouts.app')
 @section('title', 'Surtir máquina')
 
+@push('styles')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+@endpush
+
 @section('content')
 @php
     $routeQuery = $route?->id ? ['route_id' => $route->id] : [];
@@ -140,6 +144,21 @@
             <div class="form-group">
                 <label class="form-label">Observaciones</label>
                 <textarea name="notes" class="form-input" rows="2" placeholder="Notas opcionales sobre el surtido...">{{ old('notes') }}</textarea>
+            </div>
+
+            {{-- Geolocalización del reporte --}}
+            <div class="form-group" style="background:var(--gacov-bg-elevated);padding:var(--space-4);border-radius:var(--radius-md);margin-bottom:var(--space-4)">
+                <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" style="color:var(--gacov-primary)"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                    <span class="form-label" style="margin-bottom:0">Ubicación GPS</span>
+                    <span id="geolocation-status" class="badge badge-neutral" style="font-size:11px">Obteniendo...</span>
+                </div>
+                <input type="hidden" name="latitude" id="latitude" value="{{ old('latitude') }}">
+                <input type="hidden" name="longitude" id="longitude" value="{{ old('longitude') }}">
+                <input type="hidden" name="geolocation_accuracy" id="geolocation_accuracy" value="{{ old('geolocation_accuracy') }}">
+                <p id="geolocation-info" style="font-size:12px;color:var(--gacov-text-muted);margin:0">
+                    Cargando geolocalización...
+                </p>
             </div>
 
             <div style="display:flex;gap:var(--space-3);padding-top:var(--space-4);border-top:1px solid var(--gacov-border)">
@@ -377,6 +396,93 @@ document.addEventListener('DOMContentLoaded', () => {
 
         applyImportedRowsToSelectedMachine();
     });
+
+    // Geolocalización del reporte
+    const geolocationStatus = document.getElementById('geolocation-status');
+    const geolocationInfo = document.getElementById('geolocation-info');
+    const latitudeInput = document.getElementById('latitude');
+    const longitudeInput = document.getElementById('longitude');
+    const accuracyInput = document.getElementById('geolocation_accuracy');
+
+    function updateGeolocationStatus(status, message) {
+        if (!geolocationStatus) return;
+
+        geolocationStatus.textContent = status;
+        switch (status) {
+            case 'success':
+                geolocationStatus.className = 'badge badge-success';
+                break;
+            case 'error':
+                geolocationStatus.className = 'badge badge-error';
+                break;
+            default:
+                geolocationStatus.className = 'badge badge-neutral';
+        }
+
+        if (geolocationInfo) {
+            geolocationInfo.textContent = message;
+        }
+    }
+
+    function handleGeolocationError(error) {
+        console.warn('Geolocation error:', error);
+
+        switch (error.code) {
+            case error.PERMISSION_DENIED:
+                updateGeolocationStatus('error', 'Permiso de ubicación denegado. Permite el acceso en tu navegador para registrar la posición.');
+                break;
+            case error.POSITION_UNAVAILABLE:
+                updateGeolocationStatus('error', 'Ubicación no disponible. El GPS del dispositivo no funciona.');
+                break;
+            case error.TIMEOUT:
+                updateGeolocationStatus('error', 'Timeout al obtener ubicación. Intenta de nuevo.');
+                break;
+            default:
+                updateGeolocationStatus('error', 'Error desconocido al obtener ubicación.');
+        }
+    }
+
+    function handleGeolocationSuccess(position) {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy);
+
+        if (latitudeInput) latitudeInput.value = lat;
+        if (longitudeInput) longitudeInput.value = lng;
+        if (accuracyInput) accuracyInput.value = accuracy + 'm';
+
+        updateGeolocationStatus(
+            'success',
+            `Lat: ${lat}, Lng: ${lng} (precisión: ±${accuracy}m)`
+        );
+    }
+
+    function requestGeolocation() {
+        if (!navigator.geolocation) {
+            updateGeolocationStatus('error', 'Geolocalización no soportada por este navegador.');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            handleGeolocationSuccess,
+            handleGeolocationError,
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 60000
+            }
+        );
+    }
+
+    // Solicitar geolocalización al cargar la página
+    requestGeolocation();
+
+    // Botón para reintentar geolocalización
+    if (geolocationStatus) {
+        geolocationStatus.style.cursor = 'pointer';
+        geolocationStatus.title = 'Clic para reintentar';
+        geolocationStatus.addEventListener('click', requestGeolocation);
+    }
 });
 </script>
 @endpush
