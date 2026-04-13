@@ -8,6 +8,7 @@ use App\Domain\Tenant\Services\TenantContext;
 use App\Models\AppModule;
 use Closure;
 use Illuminate\Http\Request;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -52,16 +53,28 @@ final class RequireModuleAccess
             return true;
         }
 
-        // Verificar permiso específico del módulo (view o own para dashboard personalizado)
-        $permission = "{$moduleKey}.view";
-        $ownPermission = "{$moduleKey}.own";
-
         // Dashboard permite tanto view como own (dashboard personalizado del conductor)
         if ($moduleKey === 'dashboard') {
-            return $user->hasPermissionTo($permission) || $user->hasPermissionTo($ownPermission);
+            // Verificar si tiene dashboard.view O dashboard.own
+            $hasView = $this->userHasPermission($user, 'dashboard.view');
+            $hasOwn = $this->userHasPermission($user, 'dashboard.own');
+
+            return $hasView || $hasOwn;
         }
 
-        return $user->hasPermissionTo($permission);
+        return $this->userHasPermission($user, "{$moduleKey}.view");
+    }
+
+    /**
+     * Verifica si el usuario tiene un permiso específico (sin lanzar excepción).
+     */
+    private function userHasPermission($user, string $permission): bool
+    {
+        try {
+            return $user->hasPermissionTo($permission);
+        } catch (PermissionDoesNotExist) {
+            return false;
+        }
     }
 
     /**
@@ -78,6 +91,13 @@ final class RequireModuleAccess
                 'required_phase' => $module?->phase_required,
                 'current_phase' => $this->tenantContext->currentPhase(),
             ], 403);
+        }
+
+        // Si es dashboard y el usuario es conductor, redirigir a su dashboard
+        $user = auth()->user();
+        if ($moduleKey === 'dashboard' && $user?->hasRole('conductor')) {
+            return redirect()->route('driver.dashboard')
+                ->with('info', 'Redirigiendo a tu panel de conductor.');
         }
 
         // Redirigir con mensaje de error
