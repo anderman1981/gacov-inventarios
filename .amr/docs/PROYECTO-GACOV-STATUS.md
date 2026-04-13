@@ -2,7 +2,7 @@
 
 ## 📅 Última Actualización
 **Fecha:** 13 de abril de 2026  
-**Versión:** 1.0  
+**Versión:** 1.1  
 **Auditoría:** AMR Tech v2.0
 
 ---
@@ -11,16 +11,74 @@
 
 | Módulo | Estado | Descripción |
 |--------|--------|-------------|
-| Dashboard | ✅ Operativo | Widgets por rol (admin, manager, contador, conductor) |
+| Dashboard | ✅ Operativo | Widgets por rol (admin, manager, contador, conductor) + mapa de máquinas |
 | Inventario | ✅ Operativo | Bodega principal, vehículos, máquinas |
 | Productos | ✅ Operativo | Catálogo con stock mínimo |
 | Traslados | ✅ Operativo | Flujo completo con aprobación |
 | Máquinas | ✅ Operativo | Inventario independiente por máquina |
-| Conductores | ✅ Operativo | Surtido, ventas, inventario vehicular |
+| Conductores | ✅ Operativo | Surtido, ventas, inventario vehicular + GPS |
 | Reportes | ✅ Operativo | Movimientos con trazabilidad |
 | Facturas | ✅ Operativo | CRUD completo con PDF |
 | Módulos SaaS | ✅ Operativo | Sistema de fases y upgrades |
 | PWA | ✅ Operativo | Instalable en dispositivos |
+
+---
+
+## 🚛 Perfil Conductor - Control de Acceso
+
+### Permisos por Defecto del Conductor ✅
+
+| Permiso | Acceso | Descripción |
+|---------|--------|-------------|
+| `products.view` | ✅ | Ver catálogo de productos |
+| `stockings.view` | ✅ | Ver historial de surtidos |
+| `stockings.create` | ✅ | Registrar nuevos surtidos |
+| `stockings.own` | ✅ | Solo sus propios surtidos |
+| `sales.view` | ✅ | Ver ventas |
+| `sales.create` | ✅ | Registrar ventas |
+| `sales.own` | ✅ | Solo sus propias ventas |
+| `dashboard.own` | ✅ | Dashboard personalizado |
+| `vehicle.view` | ✅ | Ver vehículo asignado |
+| `vehicle.inventory.view` | ✅ | Inventario del vehículo |
+
+### Permisos RESTRINGIDOS para Conductores ❌
+
+| Permiso | Motivo |
+|---------|--------|
+| `machines.view` | No debe ver TODAS las máquinas |
+| `inventory.view` | No debe ver bodega principal |
+| `transfers.view` | No debe ver traslados |
+
+### Filtro por Ruta Asignada ✅
+
+El conductor solo ve:
+- Máquinas de SU ruta (`route_id` igual a su `user.route_id`)
+- Vehículo de SU ruta
+- Inventario de SU bodega vehicular
+
+---
+
+## 📍 Geolocalización y Mapa
+
+### Características Implementadas ✅
+
+| Feature | Estado | Descripción |
+|---------|--------|-------------|
+| Captura GPS en surtido | ✅ | Lat, Lng, Accuracy al registrar |
+| Mapa de máquinas | ✅ | Leaflet + OpenStreetMap |
+| Marcadores por stock | ✅ | Verde/amarillo/rojo según nivel |
+| Popup con detalles | ✅ | Código, ubicación, stock |
+
+### Campos de Geolocalización
+
+**En `machines`:**
+- `latitude` (DECIMAL 10,8)
+- `longitude` (DECIMAL 11,8)
+
+**En `machine_stocking_records`:**
+- `latitude` (DECIMAL 10,8)
+- `longitude` (DECIMAL 11,8)
+- `geolocation_accuracy` (VARCHAR 20)
 
 ---
 
