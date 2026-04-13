@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Route;
 
 /**
  * Rutas del módulo de facturas.
- * Requiere autenticación y contexto de tenant.
+ * Requiere autenticación, contexto de tenant Y módulo de facturas habilitado.
  */
-Route::middleware(['auth', 'tenant'])
+Route::middleware(['auth', 'tenant', 'module:invoices'])
     ->prefix('invoices')
     ->name('invoices.')
     ->group(function (): void {
@@ -41,7 +41,7 @@ Route::middleware(['auth', 'tenant'])
 /**
  * API routes para facturas.
  */
-Route::middleware(['auth', 'tenant', 'api'])
+Route::middleware(['auth', 'tenant', 'module:invoices', 'api'])
     ->prefix('api/invoices')
     ->name('api.invoices.')
     ->group(function (): void {
