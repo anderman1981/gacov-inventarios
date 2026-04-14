@@ -47,9 +47,12 @@ self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) return;
 
-  // Skip API and Livewire requests
+  // Skip API, Livewire, and authentication routes
   if (event.request.url.includes('/api/') || 
-      event.request.url.includes('/livewire/')) {
+      event.request.url.includes('/livewire/') ||
+      event.request.url.includes('/login') ||
+      event.request.url.includes('/register') ||
+      event.request.url.includes('/password/')) {
     return;
   }
 
@@ -60,6 +63,11 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(event.request).then((response) => {
+        // Don't cache redirects (like login redirect)
+        if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+          return response;
+        }
+
         // Don't cache non-successful responses
         if (!response || response.status !== 200) {
           return response;
