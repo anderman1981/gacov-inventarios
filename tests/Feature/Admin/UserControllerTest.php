@@ -151,6 +151,10 @@ final class UserControllerTest extends TestCase
             'email'    => 'conductor2@test.com',
             'route_id' => $route->id,
         ]);
+        $this->assertDatabaseHas('routes', [
+            'id' => $route->id,
+            'driver_user_id' => User::query()->where('email', 'conductor2@test.com')->value('id'),
+        ]);
     }
 
     public function test_non_conductor_user_does_not_get_route_id(): void

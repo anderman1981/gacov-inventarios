@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Dashboard;
 
+use App\Models\Product;
 use App\Models\TransferOrder;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\InventoryAdjustmentNotification;
 use Tests\TestCase;
 
 final class DashboardControllerTest extends TestCase
@@ -98,5 +100,29 @@ final class DashboardControllerTest extends TestCase
         $response->assertViewHas('pendingTransfers');
         $response->assertViewHas('recentMovements');
         $response->assertViewHas('routes');
+        $response->assertViewHas('inventoryNotifications');
+    }
+
+    public function test_admin_dashboard_shows_inventory_notifications_panel(): void
+    {
+        $actor = User::factory()->create(['is_super_admin' => true]);
+        $actor->syncRoles(['manager']);
+        $warehouse = Warehouse::factory()->create(['type' => 'maquina', 'name' => 'Máquina M104']);
+        $product = Product::factory()->create(['name' => 'Agua 600ML']);
+
+        $this->adminUser->notify(new InventoryAdjustmentNotification(
+            actor: $actor,
+            warehouse: $warehouse,
+            product: $product,
+            oldQuantity: 10,
+            newQuantity: 14,
+            reason: 'Diferencia encontrada en conteo físico.',
+        ));
+
+        $response = $this->actingAs($this->adminUser)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Ajustes pendientes de revisión');
+        $response->assertSee('Diferencia encontrada en conteo físico.');
     }
 }

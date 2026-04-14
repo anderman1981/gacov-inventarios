@@ -2218,6 +2218,187 @@ body.project-audit-open {
   padding: 30px;
 }
 
+.route-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.route-board__lane {
+  min-height: 280px;
+  padding: var(--space-4);
+  border: 1px solid var(--gacov-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(17,24,39,0.96) 0%, rgba(15,23,42,0.9) 100%);
+  transition:
+    border-color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.route-board__lane--unassigned {
+  border-style: dashed;
+}
+
+.route-board__lane--over {
+  border-color: rgba(0, 212, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.25), 0 18px 36px rgba(0, 0, 0, 0.28);
+  transform: translateY(-2px);
+}
+
+.route-board__lane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.route-board__lane-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gacov-text-primary);
+}
+
+.route-board__lane-copy {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--gacov-text-muted);
+}
+
+.route-board__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.route-board__empty {
+  padding: var(--space-5);
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+  border-radius: var(--radius-lg);
+  color: var(--gacov-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.route-card {
+  padding: var(--space-4);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.96);
+  cursor: grab;
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.22);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.route-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 212, 255, 0.3);
+}
+
+.route-card--dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.route-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--gacov-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.route-card__title {
+  margin-top: var(--space-3);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gacov-text-primary);
+}
+
+.route-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: 12px;
+  color: var(--gacov-text-muted);
+}
+
+.route-calendar__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+
+.route-calendar__period {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border: 1px solid rgba(0, 212, 255, 0.18);
+  border-radius: var(--radius-xl);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--gacov-text-primary);
+  font-weight: 700;
+  text-align: center;
+}
+
+.route-calendar {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.route-calendar__day {
+  padding: var(--space-5);
+  border: 1px solid var(--gacov-border);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(180deg, rgba(17,24,39,0.96) 0%, rgba(15,23,42,0.92) 100%);
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.2);
+}
+
+.route-calendar__day-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.route-calendar__day-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gacov-text-primary);
+}
+
+.route-calendar__day-copy {
+  margin-top: 4px;
+  color: var(--gacov-text-muted);
+  font-size: 13px;
+}
+
+.route-calendar__lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
 .project-audit-summary {
   margin-bottom: 28px;
   padding: 28px;

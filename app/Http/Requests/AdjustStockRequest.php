@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Models\Warehouse;
+use App\Support\Inventory\InventoryAdjustmentService;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class AdjustStockRequest extends FormRequest
@@ -15,11 +17,16 @@ final class AdjustStockRequest extends FormRequest
 
     public function rules(): array
     {
+        $warehouse = Warehouse::query()->whereKey($this->integer('warehouse_id'))->first();
+        $requiresReason = $warehouse instanceof Warehouse
+            ? app(InventoryAdjustmentService::class)->contextFor($warehouse)['requires_reason']
+            : true;
+
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
             'new_quantity' => ['required', 'integer', 'min:0'],
-            'reason' => ['required', 'string', 'max:255'],
+            'reason' => [$requiresReason ? 'required' : 'nullable', 'string', 'max:500'],
         ];
     }
 
@@ -30,7 +37,7 @@ final class AdjustStockRequest extends FormRequest
             'warehouse_id.required' => 'Debe seleccionar una bodega.',
             'new_quantity.required' => 'La nueva cantidad es obligatoria.',
             'new_quantity.min' => 'La cantidad no puede ser negativa.',
-            'reason.required' => 'El motivo del ajuste es obligatorio.',
+            'reason.required' => 'La observación del ajuste es obligatoria después de la carga inicial.',
         ];
     }
 }

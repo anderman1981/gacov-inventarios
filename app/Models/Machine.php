@@ -8,6 +8,7 @@ use App\Domain\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class Machine extends Model
@@ -42,5 +43,10 @@ final class Machine extends Model
     public function sales(): HasMany
     {
         return $this->hasMany(MachineSale::class);
+    }
+
+    public function warehouse(): HasOne
+    {
+        return $this->hasOne(Warehouse::class, 'machine_id');
     }
 }

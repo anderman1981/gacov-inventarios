@@ -3,6 +3,7 @@
 @endphp
 
 <nav class="inventory-section-nav" aria-label="Secciones de inventario">
+    @can('products.view')
     @moduleEnabled('products')
     <a href="{{ route('products.index') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'products.index' || str_starts_with($inventoryRoute, 'products.') ? 'active' : '' }}">
         <span class="inventory-section-nav__icon">
@@ -14,7 +15,9 @@
         </span>
     </a>
     @endmoduleEnabled
+    @endcan
 
+    @can('inventory.view')
     @moduleEnabled('inventory')
     <a href="{{ route('inventory.warehouse') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'inventory.warehouse' || str_starts_with($inventoryRoute, 'inventory.adjust') || str_starts_with($inventoryRoute, 'inventory.import') ? 'active' : '' }}">
         <span class="inventory-section-nav__icon">
@@ -26,7 +29,7 @@
         </span>
     </a>
 
-    <a href="{{ route('inventory.vehicles') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'inventory.vehicles' ? 'active' : '' }}">
+    <a href="{{ route('inventory.vehicles') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'inventory.vehicles' || str_starts_with($inventoryRoute, 'inventory.vehicles.import') ? 'active' : '' }}">
         <span class="inventory-section-nav__icon">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 11a1 1 0 011-1h9l2.447-2.04A1 1 0 0117 8.728V14a2 2 0 01-2 2h-.382a2.5 2.5 0 01-4.236 0H8.618a2.5 2.5 0 01-4.236 0H4a2 2 0 01-2-2v-3z"/></svg>
         </span>
@@ -36,7 +39,9 @@
         </span>
     </a>
     @endmoduleEnabled
+    @endcan
 
+    @can('machines.view')
     @moduleEnabled('machines')
     <a href="{{ route('inventory.machines') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'inventory.machines' ? 'active' : '' }}">
         <span class="inventory-section-nav__icon">
@@ -48,4 +53,5 @@
         </span>
     </a>
     @endmoduleEnabled
+    @endcan
 </nav>

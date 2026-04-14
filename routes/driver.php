@@ -20,6 +20,6 @@ Route::middleware(['auth', 'tenant'])->prefix('driver')->name('driver.')->group(
     });
 
     Route::get('/inventory', [DriverController::class, 'vehicleInventory'])
-        ->middleware('module:inventory')
+        ->middleware('module:drivers')
         ->name('inventory');
 });

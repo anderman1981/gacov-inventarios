@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Application\UseCase\Inventory\ImportInitialInventoryHandler;
+use App\Application\UseCase\Inventory\ImportMachineInitialInventoryHandler;
+use App\Application\UseCase\Inventory\ImportVehicleInventoryHandler;
 use App\Exports\InitialInventoryTemplateExport;
+use App\Exports\MachineInitialInventoryTemplateExport;
+use App\Exports\VehicleInventoryTemplateExport;
 use App\Http\Requests\AdjustStockRequest;
 use App\Http\Requests\ImportInitialInventoryRequest;
 use App\Models\ExcelImport;
@@ -14,10 +18,15 @@ use App\Models\Product;
 use App\Models\Route;
 use App\Models\Stock;
 use App\Models\StockMovement;
+use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\InventoryAdjustmentNotification;
+use App\Support\Inventory\InventoryAdjustmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -95,11 +104,14 @@ final class InventoryController extends Controller
         ));
     }
 
-    public function adjust(Request $request): View
+    public function adjust(Request $request, InventoryAdjustmentService $adjustmentService): View
     {
         abort_unless(auth()->user()?->can('inventory.adjust'), 403);
 
-        $mainWarehouse = Warehouse::where('type', 'bodega')->firstOrFail();
+        $warehouse = $adjustmentService->resolveWarehouse(
+            $request->filled('warehouse_id') ? $request->integer('warehouse_id') : null
+        );
+        $adjustmentContext = $adjustmentService->contextFor($warehouse);
         $products = Product::where('is_active', true)->orderBy('name')->get();
 
         $selectedProduct = null;
@@ -107,31 +119,35 @@ final class InventoryController extends Controller
 
         if ($productId = $request->integer('product_id')) {
             $selectedProduct = Product::find($productId);
-            $currentStock = (int) (Stock::where('warehouse_id', $mainWarehouse->id)
+            $currentStock = (int) (Stock::where('warehouse_id', $warehouse->id)
                 ->where('product_id', $productId)
                 ->value('quantity') ?? 0);
         }
 
         return view('inventory.adjust', compact(
-            'mainWarehouse', 'products', 'selectedProduct', 'currentStock'
+            'warehouse', 'adjustmentContext', 'products', 'selectedProduct', 'currentStock'
         ));
     }
 
-    public function storeAdjust(AdjustStockRequest $request): RedirectResponse
+    public function storeAdjust(AdjustStockRequest $request, InventoryAdjustmentService $adjustmentService): RedirectResponse
     {
         abort_unless(auth()->user()?->can('inventory.adjust'), 403);
 
-        $warehouse = Warehouse::findOrFail($request->integer('warehouse_id'));
+        $warehouse = $adjustmentService->resolveWarehouse($request->integer('warehouse_id'));
+        $adjustmentContext = $adjustmentService->contextFor($warehouse);
         $product = Product::findOrFail($request->integer('product_id'));
         $newQty = $request->integer('new_quantity');
+        $reason = trim((string) $request->input('reason'));
+        $oldQty = 0;
+        $diff = 0;
 
-        DB::transaction(function () use ($warehouse, $product, $newQty, $request): void {
+        DB::transaction(function () use ($warehouse, $product, $newQty, $reason, $adjustmentContext, &$oldQty, &$diff): void {
             $stock = Stock::firstOrNew([
                 'warehouse_id' => $warehouse->id,
                 'product_id' => $product->id,
             ]);
 
-            $oldQty = $stock->quantity ?? 0;
+            $oldQty = (int) ($stock->quantity ?? 0);
             $diff = $newQty - $oldQty;
 
             $stock->quantity = $newQty;
@@ -142,17 +158,34 @@ final class InventoryController extends Controller
                     'product_id' => $product->id,
                     'origin_warehouse_id' => $diff < 0 ? $warehouse->id : null,
                     'destination_warehouse_id' => $diff >= 0 ? $warehouse->id : null,
-                    'movement_type' => 'ajuste_manual',
+                    'movement_type' => $adjustmentContext['is_initial_load'] ? 'carga_inicial' : 'ajuste_manual',
                     'quantity' => abs($diff),
                     'reference_code' => 'AJUSTE-'.now()->format('YmdHis'),
-                    'notes' => $request->input('reason'),
+                    'notes' => $reason !== '' ? $reason : null,
                     'performed_by' => auth()->id(),
                 ]);
             }
         });
 
-        return redirect()->route('inventory.warehouse')
-            ->with('success', "Stock de «{$product->name}» ajustado correctamente.");
+        $actor = auth()->user();
+
+        if (
+            $adjustmentService->shouldNotifyAdmins((bool) $adjustmentContext['requires_reason'], $actor, $diff)
+            && Schema::hasTable('notifications')
+            && $actor instanceof User
+        ) {
+            $recipients = $adjustmentService->adminRecipients($actor->id);
+
+            if ($recipients->isNotEmpty()) {
+                Notification::send(
+                    $recipients,
+                    new InventoryAdjustmentNotification($actor, $warehouse, $product, $oldQty, $newQty, $reason)
+                );
+            }
+        }
+
+        return redirect()->route($adjustmentContext['back_route'])
+            ->with('success', "{$adjustmentContext['success_prefix']} para «{$product->name}».");
     }
 
     public function movements(Request $request): View
@@ -196,7 +229,7 @@ final class InventoryController extends Controller
         return view('inventory.movements', compact('movements', 'movementTypes', 'perPage', 'perPageOptions'));
     }
 
-    public function vehicleStocks(Request $request): View
+    public function vehicleStocks(Request $request, InventoryAdjustmentService $adjustmentService): View
     {
         abort_unless(auth()->user()?->can('inventory.view'), 403);
 
@@ -221,7 +254,7 @@ final class InventoryController extends Controller
             ->orderBy('name')
             ->paginate($perPage)
             ->withQueryString()
-            ->through(function (Route $route): Route {
+            ->through(function (Route $route) use ($adjustmentService): Route {
                 $vehicleWarehouse = Warehouse::where('route_id', $route->id)
                     ->where('type', 'vehiculo')
                     ->first();
@@ -234,6 +267,9 @@ final class InventoryController extends Controller
                         ->get()
                         ->sortBy('product.name')
                     : collect();
+                $route->vehicle_inventory_initialized = $vehicleWarehouse
+                    ? $adjustmentService->hasInventoryActivity($vehicleWarehouse)
+                    : false;
 
                 return $route;
             });
@@ -262,7 +298,7 @@ final class InventoryController extends Controller
         ));
     }
 
-    public function machineStocks(Request $request): View
+    public function machineStocks(Request $request, InventoryAdjustmentService $adjustmentService): View
     {
         abort_unless(auth()->user()?->can('inventory.view'), 403);
 
@@ -288,7 +324,7 @@ final class InventoryController extends Controller
             ->orderBy('name')
             ->paginate($perPage)
             ->withQueryString()
-            ->through(function (Machine $machine): Machine {
+            ->through(function (Machine $machine) use ($adjustmentService): Machine {
                 $machineWarehouse = Warehouse::where('machine_id', $machine->id)
                     ->where('type', 'maquina')
                     ->first();
@@ -305,10 +341,14 @@ final class InventoryController extends Controller
 
                 $machine->stock_units = (int) $machine->machine_stocks->sum('quantity');
                 $machine->stock_skus = $machine->machine_stocks->count();
-                $machine->has_initial_inventory = $machine->machine_warehouse !== null;
+                $machine->has_initial_inventory = $machineWarehouse
+                    ? $adjustmentService->hasInventoryActivity($machineWarehouse)
+                    : false;
 
                 return $machine;
             });
+
+        $machinesCollection = $machines->getCollection();
 
         $routes = Route::where('is_active', true)
             ->orderBy('name')
@@ -319,18 +359,32 @@ final class InventoryController extends Controller
             ->where('type', 'maquina')
             ->whereIn('machine_id', $machineIdsSubquery)
             ->count();
+        $machinesPendingInitialLoad = (clone $machineQuery)
+            ->get()
+            ->filter(function (Machine $machine) use ($adjustmentService): bool {
+                $machineWarehouse = Warehouse::where('machine_id', $machine->id)
+                    ->where('type', 'maquina')
+                    ->first();
+
+                return $machineWarehouse instanceof Warehouse
+                    && ! $adjustmentService->hasInventoryActivity($machineWarehouse);
+            })
+            ->count();
         $totalUnits = (int) Stock::query()
             ->join('warehouses', 'warehouses.id', '=', 'stock.warehouse_id')
             ->where('warehouses.type', 'maquina')
             ->whereIn('warehouses.machine_id', $machineIdsSubquery)
             ->sum('stock.quantity');
-        $visibleUnits = (int) $machines->getCollection()->sum('stock_units');
+        $visibleUnits = (int) $machinesCollection->sum('stock_units');
+        $machineBulkInitialAvailable = $machinesPendingInitialLoad > 0;
 
         return view('inventory.machine-stocks', compact(
             'machines',
             'routes',
             'totalMachines',
             'configuredWarehouses',
+            'machinesPendingInitialLoad',
+            'machineBulkInitialAvailable',
             'totalUnits',
             'visibleUnits',
             'perPage',
@@ -365,6 +419,134 @@ final class InventoryController extends Controller
             new InitialInventoryTemplateExport,
             'template-carga-inicial-inventario.xlsx'
         );
+    }
+
+    public function vehicleImportForm(): View
+    {
+        abort_unless(auth()->user()?->can('inventory.load_vehicle_excel'), 403);
+
+        $activeRoutes = Route::query()->where('is_active', true)->count();
+        $configuredVehicles = Warehouse::query()
+            ->where('type', 'vehiculo')
+            ->where('is_active', true)
+            ->count();
+        $recentImports = ExcelImport::query()
+            ->with('user')
+            ->where('import_type', 'inventario_vehiculos')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        return view('inventory.import-vehicles', compact('activeRoutes', 'configuredVehicles', 'recentImports'));
+    }
+
+    public function downloadVehicleImportTemplate(): BinaryFileResponse
+    {
+        abort_unless(auth()->user()?->can('inventory.load_vehicle_excel'), 403);
+
+        return Excel::download(
+            new VehicleInventoryTemplateExport,
+            'template-carga-masiva-vehiculos.xlsx'
+        );
+    }
+
+    public function machineImportForm(InventoryAdjustmentService $adjustmentService): View
+    {
+        abort_unless(auth()->user()?->can('inventory.load_machine_excel'), 403);
+
+        $activeMachines = Machine::query()->where('is_active', true)->count();
+        $configuredWarehouses = Warehouse::query()
+            ->where('type', 'maquina')
+            ->where('is_active', true)
+            ->count();
+        $machinesPendingInitialLoad = Machine::query()
+            ->where('is_active', true)
+            ->get()
+            ->filter(function (Machine $machine) use ($adjustmentService): bool {
+                $warehouse = Warehouse::query()
+                    ->where('type', 'maquina')
+                    ->where('machine_id', $machine->id)
+                    ->first();
+
+                return $warehouse instanceof Warehouse
+                    && ! $adjustmentService->hasInventoryActivity($warehouse);
+            })
+            ->count();
+        $recentImports = ExcelImport::query()
+            ->with('user')
+            ->where('import_type', 'inventario_maquinas_inicial')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        return view('inventory.import-machines-initial', compact(
+            'activeMachines',
+            'configuredWarehouses',
+            'machinesPendingInitialLoad',
+            'recentImports',
+        ));
+    }
+
+    public function downloadMachineImportTemplate(): BinaryFileResponse
+    {
+        abort_unless(auth()->user()?->can('inventory.load_machine_excel'), 403);
+
+        return Excel::download(
+            new MachineInitialInventoryTemplateExport(),
+            'template-carga-inicial-maquinas.xlsx'
+        );
+    }
+
+    public function storeVehicleImport(
+        ImportInitialInventoryRequest $request,
+        ImportVehicleInventoryHandler $handler,
+    ): RedirectResponse {
+        abort_unless(auth()->user()?->can('inventory.load_vehicle_excel'), 403);
+
+        try {
+            $importLog = $handler->handle(
+                file: $request->file('inventory_file'),
+                user: $request->user(),
+            );
+        } catch (Throwable $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
+
+        $message = "Carga masiva de vehículos procesada. Filas exitosas: {$importLog->processed_rows}.";
+
+        if ($importLog->error_rows > 0) {
+            $message .= " Filas con error: {$importLog->error_rows}.";
+        }
+
+        return redirect()
+            ->route('inventory.vehicles.import.form')
+            ->with($importLog->error_rows > 0 ? 'error' : 'success', $message);
+    }
+
+    public function storeMachineImport(
+        ImportInitialInventoryRequest $request,
+        ImportMachineInitialInventoryHandler $handler,
+    ): RedirectResponse {
+        abort_unless(auth()->user()?->can('inventory.load_machine_excel'), 403);
+
+        try {
+            $importLog = $handler->handle(
+                file: $request->file('inventory_file'),
+                user: $request->user(),
+            );
+        } catch (Throwable $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
+
+        $message = "Carga inicial masiva de maquinas procesada. Filas exitosas: {$importLog->processed_rows}.";
+
+        if ($importLog->error_rows > 0) {
+            $message .= " Filas con error: {$importLog->error_rows}.";
+        }
+
+        return redirect()
+            ->route('inventory.machines.import.form')
+            ->with($importLog->error_rows > 0 ? 'error' : 'success', $message);
     }
 
     public function storeImport(

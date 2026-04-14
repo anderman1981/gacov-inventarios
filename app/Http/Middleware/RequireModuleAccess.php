@@ -24,7 +24,7 @@ final class RequireModuleAccess
     {
         // 1. Verificar que el módulo existe y está disponible para la fase del tenant
         if (! $this->tenantContext->canAccessModule($moduleKey)) {
-            return $this->denyAccess($request, $moduleKey, 'Este módulo no está disponible en la fase activa de tu cliente.');
+            return $this->denyAccess($request, $moduleKey, 'Este módulo no está disponible en la fase activa de tu cliente.', true);
         }
 
         // 2. Verificar que el usuario tiene permiso de ver este módulo
@@ -53,13 +53,12 @@ final class RequireModuleAccess
             return true;
         }
 
-        // Dashboard permite tanto view como own (dashboard personalizado del conductor)
+        // Dashboard permite tanto full como own.
         if ($moduleKey === 'dashboard') {
-            // Verificar si tiene dashboard.view O dashboard.own
-            $hasView = $this->userHasPermission($user, 'dashboard.view');
+            $hasFull = $this->userHasPermission($user, 'dashboard.full');
             $hasOwn = $this->userHasPermission($user, 'dashboard.own');
 
-            return $hasView || $hasOwn;
+            return $hasFull || $hasOwn;
         }
 
         return $this->userHasPermission($user, "{$moduleKey}.view");
@@ -80,7 +79,7 @@ final class RequireModuleAccess
     /**
      * Maneja el acceso denegado.
      */
-    private function denyAccess(Request $request, string $moduleKey, string $message): Response
+    private function denyAccess(Request $request, string $moduleKey, string $message, bool $phaseLocked = false): Response
     {
         $module = AppModule::query()->where('key', $moduleKey)->first();
 
@@ -98,6 +97,14 @@ final class RequireModuleAccess
         if ($moduleKey === 'dashboard' && $user?->hasRole('conductor')) {
             return redirect()->route('driver.dashboard')
                 ->with('info', 'Redirigiendo a tu panel de conductor.');
+        }
+
+        if ($phaseLocked && $module !== null) {
+            return redirect()->route('subscription.upgrade')
+                ->with('module_required', $moduleKey)
+                ->with('module_required_phase', $module->phase_required)
+                ->with('module_current_phase', $this->tenantContext->currentPhase())
+                ->with('error', $message);
         }
 
         // Redirigir con mensaje de error
