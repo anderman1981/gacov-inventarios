@@ -15,10 +15,12 @@ Route::get('/', function () {
 
 require __DIR__.'/auth.php';
 require __DIR__.'/driver.php';
+require __DIR__.'/operations.php';
 require __DIR__.'/products.php';
 require __DIR__.'/inventory.php';
 require __DIR__.'/machines.php';
 require __DIR__.'/transfers.php';
+require __DIR__.'/invoices.php';
 require __DIR__.'/admin.php';
 require __DIR__.'/super-admin.php';
 

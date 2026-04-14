@@ -33,11 +33,15 @@ final class RegisterStocking
         Warehouse $machineWarehouse,
         Collection $items,
         ?string $notes,
+        ?float $latitude = null,
+        ?float $longitude = null,
+        ?string $geolocationAccuracy = null,
     ): MachineStockingRecord {
         $this->assertSufficientVehicleStock($vehicleWarehouse, $items);
 
         return DB::transaction(function () use (
-            $user, $route, $machine, $vehicleWarehouse, $machineWarehouse, $items, $notes
+            $user, $route, $machine, $vehicleWarehouse, $machineWarehouse, $items, $notes,
+            $latitude, $longitude, $geolocationAccuracy
         ): MachineStockingRecord {
             $code = 'SURT-'.strtoupper(substr(uniqid(), -6));
 
@@ -49,6 +53,9 @@ final class RegisterStocking
                 'performed_by' => $user->id,
                 'status' => 'completado',
                 'notes' => $notes,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'geolocation_accuracy' => $geolocationAccuracy,
                 'was_offline' => false,
                 'started_at' => now(),
                 'completed_at' => now(),

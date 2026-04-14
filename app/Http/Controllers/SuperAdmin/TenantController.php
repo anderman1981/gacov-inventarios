@@ -103,10 +103,10 @@ final class TenantController extends Controller
             'trial_ends_at' => $data['status'] === 'trial' ? now()->addDays(14) : null,
         ]);
 
-        TenantBillingProfile::create([
-            'tenant_id' => $tenant->id,
-            ...TenantBillingProfile::defaultPayload(),
-        ]);
+        TenantBillingProfile::updateOrCreate(
+            ['tenant_id' => $tenant->id],
+            TenantBillingProfile::defaultPayload()
+        );
 
         return redirect()->route('super-admin.tenants.show', $tenant)
             ->with('success', "Cliente {$tenant->name} creado exitosamente.");

@@ -16,8 +16,20 @@
                 <span class="badge badge-info">Maquinas activas: {{ number_format($totalMachines, 0, ',', '.') }}</span>
                 <span class="badge badge-success">Con bodega: {{ number_format($configuredWarehouses, 0, ',', '.') }}</span>
                 <span class="badge badge-neutral">Unidades totales: {{ number_format($totalUnits, 0, ',', '.') }}</span>
+                <span class="badge {{ $machineBulkInitialAvailable ? 'badge-warning' : 'badge-neutral' }}">Pendientes por carga inicial: {{ number_format($machinesPendingInitialLoad, 0, ',', '.') }}</span>
             </div>
         </div>
+        @can('inventory.load_machine_excel')
+        <div class="inventory-hero__actions">
+            @if($machineBulkInitialAvailable)
+            <a href="{{ route('inventory.machines.import.form') }}" class="btn btn-primary">Carga inicial por Excel</a>
+            @else
+            <span class="btn" style="width:auto;background:#e5e7eb;color:#475569;cursor:not-allowed;opacity:.9">
+                Carga masiva cerrada
+            </span>
+            @endif
+        </div>
+        @endcan
     </div>
 </section>
 
@@ -96,6 +108,13 @@
                     <span class="badge {{ $machine->machine_warehouse ? 'badge-success' : 'badge-neutral' }}">
                         {{ $machine->machine_warehouse ? 'Bodega configurada' : 'Sin bodega' }}
                     </span>
+                    @can('inventory.adjust')
+                    @if($machine->machine_warehouse)
+                    <a href="{{ route('inventory.adjust', ['warehouse_id' => $machine->machine_warehouse->id]) }}" class="badge badge-warning" style="text-decoration:none">
+                        {{ $machine->has_initial_inventory ? 'Corregir inventario' : 'Carga inicial' }}
+                    </a>
+                    @endif
+                    @endcan
                     <a href="{{ route('machines.show', $machine) }}" class="badge badge-info" style="text-decoration:none">
                         Ver detalle
                     </a>

@@ -1,14 +1,43 @@
 @extends('layouts.app')
 @section('title', 'Surtir máquina')
 
+@push('styles')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+@endpush
+
 @section('content')
 @php
     $routeQuery = $route?->id ? ['route_id' => $route->id] : [];
+    $selectedMachineId = (string) old('machine_id', request('machine_id', ''));
+    $selectedMachine = $machines->firstWhere('id', (int) $selectedMachineId);
+    $machineLocations = $machines
+        ->map(fn ($machine) => filled($machine->location) ? trim((string) $machine->location) : 'Sin ubicación definida')
+        ->unique(fn ($location) => mb_strtolower((string) $location))
+        ->sort()
+        ->values();
+    $selectedLocationGroup = (string) old(
+        'stocking_location_group',
+        filled($selectedMachine?->location) ? trim((string) $selectedMachine->location) : ''
+    );
 @endphp
 <div class="page-header">
     <h1 class="page-title">Surtir máquina</h1>
     <p class="page-subtitle"><a href="{{ route('driver.dashboard', $routeQuery) }}" style="color:var(--gacov-text-muted);text-decoration:none">Mi ruta</a> / Surtir máquina</p>
 </div>
+
+@if($errors->any())
+<div class="alert alert-error" style="margin-bottom:var(--space-5)">
+    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+    <div>
+        <strong>No pudimos registrar el surtido.</strong>
+        <ul style="margin-top:6px;padding-left:18px;list-style:disc;">
+            @foreach($errors->all() as $error)
+            <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+</div>
+@endif
 
 @if($availableRoutes->isNotEmpty())
 <div class="panel" style="margin-bottom:var(--space-5)">
@@ -51,10 +80,6 @@
 </div>
 @endif
 
-@if($route && $machines->isNotEmpty())
-<livewire:driver.stocking-photo-import :route-id="$route?->id" />
-@endif
-
 <div class="panel" style="max-width:900px">
     <div class="panel-header">
         <span class="panel-title">Registro de surtido</span>
@@ -63,27 +88,70 @@
         @endif
     </div>
     <div class="panel-body">
+        <div class="alert alert-info" style="margin-bottom:var(--space-5)">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-3a1 1 0 10-2 0 1 1 0 002 0zm-2 3a1 1 0 000 2v2a1 1 0 102 0v-2a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
+            <div>
+                <strong>Surtido manual para conductor.</strong>
+                Registra aquí las cantidades que vas a cargar en la máquina seleccionada.
+            </div>
+        </div>
+
         <form method="POST" action="{{ route('driver.stocking.store') }}">
             @csrf
             <input type="hidden" name="route_id" value="{{ $route?->id }}">
             <div class="form-group" style="margin-bottom:var(--space-6)">
+                <label class="form-label" for="stocking-location-group">Ubicación de la máquina <span style="color:var(--gacov-error)">*</span></label>
+                <select id="stocking-location-group" name="stocking_location_group" class="form-input" {{ $machines->isEmpty() ? 'disabled' : '' }}>
+                    <option value="">Seleccionar ubicación...</option>
+                    @foreach($machineLocations as $locationGroup)
+                    @php
+                        $locationMachineCount = $machines->filter(function ($machine) use ($locationGroup) {
+                            $machineLocation = filled($machine->location) ? trim((string) $machine->location) : 'Sin ubicación definida';
+
+                            return mb_strtolower($machineLocation) === mb_strtolower((string) $locationGroup);
+                        })->count();
+                    @endphp
+                    <option value="{{ $locationGroup }}" {{ $selectedLocationGroup === (string) $locationGroup ? 'selected' : '' }}>
+                        {{ $locationGroup }} ({{ $locationMachineCount }} máquina{{ $locationMachineCount === 1 ? '' : 's' }})
+                    </option>
+                    @endforeach
+                </select>
+                <p style="font-size:12px;color:var(--gacov-text-muted);margin-top:6px">
+                    Primero elige la ubicación y luego el sistema te mostrará solo las máquinas de ese punto.
+                </p>
+            </div>
+
+            <div class="form-group" style="margin-bottom:var(--space-6)">
                 <label class="form-label">Máquina a surtir <span style="color:var(--gacov-error)">*</span></label>
-                <select id="stocking-machine-id" name="machine_id" class="form-input {{ $errors->has('machine_id') ? 'is-invalid' : '' }}" required>
+                <select
+                    id="stocking-machine-id"
+                    name="machine_id"
+                    class="form-input {{ $errors->has('machine_id') ? 'is-invalid' : '' }}"
+                    data-placeholder-default="Seleccionar ubicación primero..."
+                    data-placeholder-ready="Seleccionar máquina..."
+                    required
+                    {{ $machines->isEmpty() ? 'disabled' : '' }}>
                     <option value="">Seleccionar máquina...</option>
                     @foreach($machines as $machine)
                     @php
                         $machineCode = strtoupper(trim((string) $machine->code));
                         $machineSelected = old('machine_id') == $machine->id || request('machine_id') == $machine->id;
+                        $machineLocationGroup = filled($machine->location) ? trim((string) $machine->location) : 'Sin ubicación definida';
                     @endphp
                     <option
                         value="{{ $machine->id }}"
+                        data-machine-option="true"
                         data-machine-code="{{ $machineCode }}"
                         data-machine-name="{{ $machine->name }}"
+                        data-location-group="{{ $machineLocationGroup }}"
                         {{ $machineSelected ? 'selected' : '' }}>
-                        {{ $machine->code }} — {{ $machine->name }}{{ $machine->location ? ' (' . $machine->location . ')' : '' }}
+                        {{ $machine->code }} — {{ $machine->name }}{{ $machine->location ? ' (' . $machineLocationGroup . ')' : '' }}
                     </option>
                     @endforeach
                 </select>
+                <p style="font-size:12px;color:var(--gacov-text-muted);margin-top:6px">
+                    Esto evita mezclar máquinas de diferentes puntos de la ruta y hace más rápido el registro.
+                </p>
                 @error('machine_id')<span class="form-error">{{ $message }}</span>@enderror
             </div>
 
@@ -142,6 +210,21 @@
                 <textarea name="notes" class="form-input" rows="2" placeholder="Notas opcionales sobre el surtido...">{{ old('notes') }}</textarea>
             </div>
 
+            {{-- Geolocalización del reporte --}}
+            <div class="form-group" style="background:var(--gacov-bg-elevated);padding:var(--space-4);border-radius:var(--radius-md);margin-bottom:var(--space-4)">
+                <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" style="color:var(--gacov-primary)"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                    <span class="form-label" style="margin-bottom:0">Ubicación GPS</span>
+                    <span id="geolocation-status" class="badge badge-neutral" style="font-size:11px">Obteniendo...</span>
+                </div>
+                <input type="hidden" name="latitude" id="latitude" value="{{ old('latitude') }}">
+                <input type="hidden" name="longitude" id="longitude" value="{{ old('longitude') }}">
+                <input type="hidden" name="geolocation_accuracy" id="geolocation_accuracy" value="{{ old('geolocation_accuracy') }}">
+                <p id="geolocation-info" style="font-size:12px;color:var(--gacov-text-muted);margin:0">
+                    Cargando geolocalización...
+                </p>
+            </div>
+
             <div style="display:flex;gap:var(--space-3);padding-top:var(--space-4);border-top:1px solid var(--gacov-border)">
                 <button type="submit" class="btn btn-primary" style="width:auto" {{ !$vehicleWarehouse ? 'disabled' : '' }}>
                     Registrar surtido
@@ -160,10 +243,20 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+    const locationSelect = document.getElementById('stocking-location-group');
     const machineSelect = document.getElementById('stocking-machine-id');
     const productRows = Array.from(document.querySelectorAll('.stocking-product-row'));
     const stockingForm = machineSelect?.closest('form');
     let importedRows = [];
+    const machineOptions = machineSelect
+        ? Array.from(machineSelect.querySelectorAll('option[data-machine-option="true"]')).map((option) => ({
+            value: option.value,
+            label: option.textContent?.trim() ?? '',
+            locationGroup: option.dataset.locationGroup ?? '',
+            machineCode: option.dataset.machineCode ?? '',
+            machineName: option.dataset.machineName ?? '',
+        }))
+        : [];
 
     function normalizeCode(code) {
         return String(code ?? '')
@@ -198,6 +291,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedOption = machineSelect?.selectedOptions?.[0];
 
         return normalizeMachineCode(selectedOption?.dataset.machineCode ?? '');
+    }
+
+    function createMachineOption(optionConfig) {
+        const option = new Option(optionConfig.label, optionConfig.value, false, false);
+        option.dataset.machineOption = 'true';
+        option.dataset.locationGroup = optionConfig.locationGroup;
+        option.dataset.machineCode = optionConfig.machineCode;
+        option.dataset.machineName = optionConfig.machineName;
+
+        return option;
+    }
+
+    function refreshMachineOptions() {
+        if (!(locationSelect instanceof HTMLSelectElement) || !(machineSelect instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        const selectedLocation = locationSelect.value;
+        const previousMachineId = machineSelect.value;
+        const filteredMachines = selectedLocation === ''
+            ? []
+            : machineOptions.filter((option) => option.locationGroup === selectedLocation);
+
+        const placeholderLabel = selectedLocation === ''
+            ? (machineSelect.dataset.placeholderDefault ?? 'Seleccionar ubicación primero...')
+            : (filteredMachines.length > 0
+                ? (machineSelect.dataset.placeholderReady ?? 'Seleccionar máquina...')
+                : 'No hay máquinas activas en esta ubicación');
+
+        machineSelect.innerHTML = '';
+        machineSelect.appendChild(new Option(placeholderLabel, ''));
+
+        filteredMachines.forEach((optionConfig) => {
+            machineSelect.appendChild(createMachineOption(optionConfig));
+        });
+
+        const nextMachineId = filteredMachines.some((option) => option.value === previousMachineId)
+            ? previousMachineId
+            : (filteredMachines.length === 1 ? filteredMachines[0].value : '');
+
+        machineSelect.disabled = selectedLocation === '' || filteredMachines.length === 0;
+        machineSelect.value = nextMachineId;
+        machineSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function buildProductMap() {
@@ -338,6 +474,10 @@ document.addEventListener('DOMContentLoaded', () => {
         applyImportedRowsToSelectedMachine();
     });
 
+    locationSelect?.addEventListener('change', () => {
+        refreshMachineOptions();
+    });
+
     productRows.forEach((tableRow) => {
         const input = tableRow.querySelector('[data-quantity-input="true"]');
 
@@ -377,6 +517,109 @@ document.addEventListener('DOMContentLoaded', () => {
 
         applyImportedRowsToSelectedMachine();
     });
+
+    if (locationSelect instanceof HTMLSelectElement && machineSelect instanceof HTMLSelectElement) {
+        if (!locationSelect.value && machineSelect.value) {
+            const currentMachine = machineOptions.find((option) => option.value === machineSelect.value);
+
+            if (currentMachine) {
+                locationSelect.value = currentMachine.locationGroup;
+            }
+        }
+
+        if (!locationSelect.value && machineOptions.length === 1) {
+            locationSelect.value = machineOptions[0].locationGroup;
+        }
+
+        refreshMachineOptions();
+    }
+
+    // Geolocalización del reporte
+    const geolocationStatus = document.getElementById('geolocation-status');
+    const geolocationInfo = document.getElementById('geolocation-info');
+    const latitudeInput = document.getElementById('latitude');
+    const longitudeInput = document.getElementById('longitude');
+    const accuracyInput = document.getElementById('geolocation_accuracy');
+
+    function updateGeolocationStatus(status, message) {
+        if (!geolocationStatus) return;
+
+        geolocationStatus.textContent = status;
+        switch (status) {
+            case 'success':
+                geolocationStatus.className = 'badge badge-success';
+                break;
+            case 'error':
+                geolocationStatus.className = 'badge badge-error';
+                break;
+            default:
+                geolocationStatus.className = 'badge badge-neutral';
+        }
+
+        if (geolocationInfo) {
+            geolocationInfo.textContent = message;
+        }
+    }
+
+    function handleGeolocationError(error) {
+        console.warn('Geolocation error:', error);
+
+        switch (error.code) {
+            case error.PERMISSION_DENIED:
+                updateGeolocationStatus('error', 'Permiso de ubicación denegado. Permite el acceso en tu navegador para registrar la posición.');
+                break;
+            case error.POSITION_UNAVAILABLE:
+                updateGeolocationStatus('error', 'Ubicación no disponible. El GPS del dispositivo no funciona.');
+                break;
+            case error.TIMEOUT:
+                updateGeolocationStatus('error', 'Timeout al obtener ubicación. Intenta de nuevo.');
+                break;
+            default:
+                updateGeolocationStatus('error', 'Error desconocido al obtener ubicación.');
+        }
+    }
+
+    function handleGeolocationSuccess(position) {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy);
+
+        if (latitudeInput) latitudeInput.value = lat;
+        if (longitudeInput) longitudeInput.value = lng;
+        if (accuracyInput) accuracyInput.value = accuracy + 'm';
+
+        updateGeolocationStatus(
+            'success',
+            `Lat: ${lat}, Lng: ${lng} (precisión: ±${accuracy}m)`
+        );
+    }
+
+    function requestGeolocation() {
+        if (!navigator.geolocation) {
+            updateGeolocationStatus('error', 'Geolocalización no soportada por este navegador.');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            handleGeolocationSuccess,
+            handleGeolocationError,
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 60000
+            }
+        );
+    }
+
+    // Solicitar geolocalización al cargar la página
+    requestGeolocation();
+
+    // Botón para reintentar geolocalización
+    if (geolocationStatus) {
+        geolocationStatus.style.cursor = 'pointer';
+        geolocationStatus.title = 'Clic para reintentar';
+        geolocationStatus.addEventListener('click', requestGeolocation);
+    }
 });
 </script>
 @endpush

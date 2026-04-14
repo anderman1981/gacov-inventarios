@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Machine;
-use App\Models\Route;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,14 +17,16 @@ final class MachineFactory extends Factory
     public function definition(): array
     {
         return [
-            'code'              => strtoupper($this->faker->unique()->lexify('MAQ-???')),
-            'worldoffice_code'  => $this->faker->optional()->numerify('WO-#####'),
-            'name'              => 'Máquina ' . $this->faker->numberBetween(1, 999),
-            'location'          => $this->faker->optional()->streetAddress(),
-            'route_id'          => null,
-            'operator_user_id'  => null,
-            'type'              => $this->faker->randomElement(['vending_cafe', 'vending_snack', 'vending_bebida', 'mixta']),
-            'is_active'         => true,
+            'code' => strtoupper($this->faker->unique()->lexify('MAQ-???')),
+            'worldoffice_code' => $this->faker->optional()->numerify('WO-#####'),
+            'name' => 'Máquina '.$this->faker->numberBetween(1, 999),
+            'location' => $this->faker->optional()->streetAddress(),
+            'route_id' => null,
+            'operator_user_id' => null,
+            'type' => $this->faker->randomElement(['vending_cafe', 'vending_snack', 'vending_bebida', 'mixta']),
+            'is_active' => true,
+            'latitude' => $this->faker->optional()->latitude(4.0, 5.0),
+            'longitude' => $this->faker->optional()->longitude(-75.0, -74.0),
         ];
     }
 

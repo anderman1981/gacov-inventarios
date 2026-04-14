@@ -37,4 +37,9 @@ final class Route extends Model
     {
         return $this->hasMany(Machine::class);
     }
+
+    public function scheduleAssignments(): HasMany
+    {
+        return $this->hasMany(RouteScheduleAssignment::class);
+    }
 }
