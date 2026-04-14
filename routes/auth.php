@@ -18,10 +18,6 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
-    // 5 intentos por minuto por IP — protección contra fuerza bruta
-    Route::post('login', [AuthenticatedSessionController::class, 'store'])
-        ->middleware('throttle:5,1');
-
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
@@ -36,6 +32,12 @@ Route::middleware('guest')->group(function () {
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
 });
+
+// 5 intentos por minuto por IP — protección contra fuerza bruta
+// Se deja fuera de `guest` para permitir cambio de cuenta cuando el navegador
+// arrastra una sesión anterior o una vista cacheada de login.
+Route::post('login', [AuthenticatedSessionController::class, 'store'])
+    ->middleware('throttle:5,1');
 
 Route::middleware('auth')->group(function () {
     Route::get('verify-email', EmailVerificationPromptController::class)

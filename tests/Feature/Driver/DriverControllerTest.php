@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Driver;
 
+use App\Domain\Tenant\Services\TenantContext;
 use App\Models\AppModule;
 use App\Models\Machine;
 use App\Models\Product;
 use App\Models\Route;
+use App\Models\RouteScheduleAssignment;
 use App\Models\Stock;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 final class DriverControllerTest extends TestCase
@@ -43,6 +46,7 @@ final class DriverControllerTest extends TestCase
         // Create tenant with active subscription (phase 2 covers drivers+sales+inventory)
         $plan = SubscriptionPlan::factory()->create(['phase' => 2, 'is_active' => true]);
         $this->tenant = Tenant::factory()->create(['is_active' => true]);
+        app(TenantContext::class)->setTenant($this->tenant);
         Subscription::factory()->create([
             'tenant_id' => $this->tenant->id,
             'plan_id' => $plan->id,
@@ -61,7 +65,9 @@ final class DriverControllerTest extends TestCase
         $this->driver->update(['route_id' => $this->route->id]);
         $this->driver->load('route'); // Ensure route relation is loaded
 
-        $this->machine = Machine::factory()->forRoute($this->route->id)->create();
+        $this->machine = Machine::factory()->forRoute($this->route->id)->create([
+            'location' => 'Universidad - Bloque A',
+        ]);
 
         $this->vehicleWarehouse = Warehouse::factory()->vehiculo()->create([
             'route_id' => $this->route->id,
@@ -125,6 +131,51 @@ final class DriverControllerTest extends TestCase
         $this->assertSame($this->route->id, $viewRoute?->id);
     }
 
+    public function test_driver_can_select_second_route_scheduled_for_today(): void
+    {
+        Carbon::setTestNow('2026-04-14 08:30:00');
+
+        $backupDriver = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'is_super_admin' => false,
+        ]);
+        $backupDriver->syncRoles(['conductor']);
+
+        $otherRoute = Route::factory()->withDriver($backupDriver->id)->create();
+        $backupDriver->update(['route_id' => $otherRoute->id]);
+
+        Warehouse::factory()->vehiculo()->create([
+            'route_id' => $otherRoute->id,
+        ]);
+
+        Machine::factory()->forRoute($otherRoute->id)->create([
+            'location' => 'Clínica - Torre Norte',
+        ]);
+
+        RouteScheduleAssignment::query()->create([
+            'tenant_id' => $this->tenant->id,
+            'route_id' => $otherRoute->id,
+            'assignment_date' => today()->toDateString(),
+            'driver_user_id' => $this->driver->id,
+            'assigned_by_user_id' => $this->driver->id,
+        ]);
+
+        $response = $this->actingAs($this->driver)
+            ->get(route('driver.dashboard', ['route_id' => $otherRoute->id]));
+
+        $response->assertStatus(200);
+        $viewRoute = $response->viewData('route');
+        $availableRoutes = $response->viewData('availableRoutes');
+
+        $this->assertSame($otherRoute->id, $viewRoute?->id);
+        $this->assertNotNull($availableRoutes);
+        $this->assertCount(2, $availableRoutes);
+        $this->assertTrue($availableRoutes->pluck('id')->contains($this->route->id));
+        $this->assertTrue($availableRoutes->pluck('id')->contains($otherRoute->id));
+
+        Carbon::setTestNow();
+    }
+
     public function test_dashboard_shows_today_stockings_count(): void
     {
         $response = $this->actingAs($this->driver)->get(route('driver.dashboard'));
@@ -142,6 +193,24 @@ final class DriverControllerTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('driver.stocking.create');
+        $response->assertDontSee('Carga por foto para surtido');
+        $response->assertSee('Surtido manual para conductor.');
+        $response->assertSee('Ubicación de la máquina');
+        $response->assertSee('Productos a surtir');
+    }
+
+    public function test_stocking_form_groups_machine_selection_by_location(): void
+    {
+        Machine::factory()->forRoute($this->route->id)->create([
+            'location' => 'Clínica - Torre Norte',
+        ]);
+
+        $response = $this->actingAs($this->driver)->get(route('driver.stocking.create'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Seleccionar ubicación...');
+        $response->assertSee('Universidad - Bloque A');
+        $response->assertSee('Clínica - Torre Norte');
     }
 
     public function test_stocking_form_shows_vehicle_stocks(): void
@@ -193,7 +262,7 @@ final class DriverControllerTest extends TestCase
             'items' => [$product->id => ['quantity' => 3]],
         ]);
 
-        $response->assertSessionHas('error');
+        $response->assertSessionHasErrors('route_id');
     }
 
     public function test_stocking_fails_when_all_items_are_zero(): void
@@ -290,7 +359,7 @@ final class DriverControllerTest extends TestCase
             'items' => [1 => ['quantity' => 1, 'unit_price' => 1000]],
         ]);
 
-        $response->assertSessionHas('error');
+        $response->assertSessionHasErrors('route_id');
     }
 
     public function test_sale_fails_when_all_items_zero(): void

@@ -3,13 +3,20 @@
  * Versión: 1.0.0
  */
 
-const CACHE_NAME = 'gacov-v1';
+const CACHE_NAME = 'gacov-v3';
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
+
+const CACHEABLE_DESTINATIONS = new Set([
+  'script',
+  'style',
+  'image',
+  'font',
+  'manifest',
+]);
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -47,9 +54,23 @@ self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) return;
 
+  // Let the browser handle HTML navigations and redirects natively.
+  if (event.request.mode === 'navigate') return;
+
+  // Some browser internal requests use redirect modes the SW should not override.
+  if (event.request.redirect && event.request.redirect !== 'follow') return;
+
+  const requestUrl = new URL(event.request.url);
+  const acceptHeader = event.request.headers.get('accept') || '';
+  const isHtmlRequest = acceptHeader.includes('text/html') || event.request.destination === 'document';
+
+  if (isHtmlRequest) return;
+
   // Skip API, Livewire, and authentication routes
-  if (event.request.url.includes('/api/') || 
+  if (requestUrl.pathname === '/' ||
+      event.request.url.includes('/api/') || 
       event.request.url.includes('/livewire/') ||
+      event.request.url.includes('/logout') ||
       event.request.url.includes('/login') ||
       event.request.url.includes('/register') ||
       event.request.url.includes('/password/')) {
@@ -63,13 +84,18 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(event.request).then((response) => {
-        // Don't cache redirects (like login redirect)
-        if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+        // Never cache redirects or followed redirects from authenticated routes.
+        if (response.redirected || response.type === 'opaqueredirect') {
           return response;
         }
 
         // Don't cache non-successful responses
         if (!response || response.status !== 200) {
+          return response;
+        }
+
+        // Only cache static-like assets. Dynamic HTML/app responses stay out of the SW cache.
+        if (!CACHEABLE_DESTINATIONS.has(event.request.destination) && !requestUrl.pathname.startsWith('/build/')) {
           return response;
         }
 
@@ -82,8 +108,7 @@ self.addEventListener('fetch', (event) => {
 
         return response;
       }).catch(() => {
-        // Return offline page if available
-        return caches.match('/');
+        return Response.error();
       });
     })
   );

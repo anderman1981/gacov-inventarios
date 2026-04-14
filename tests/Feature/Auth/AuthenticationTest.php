@@ -49,6 +49,24 @@ class AuthenticationTest extends TestCase
         $response = $this->actingAs($user)->post('/logout');
 
         $this->assertGuest();
-        $response->assertRedirect('/');
+        $response->assertRedirect(route('login'));
+    }
+
+    public function test_authenticated_user_can_switch_account_from_login_post(): void
+    {
+        $currentUser = User::factory()->create([
+            'email' => 'superadmin-switch@example.com',
+        ]);
+        $nextUser = User::factory()->create([
+            'email' => 'conductor-switch@example.com',
+        ]);
+
+        $response = $this->actingAs($currentUser)->post('/login', [
+            'email' => $nextUser->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticatedAs($nextUser);
+        $response->assertRedirect(route('dashboard', absolute: false));
     }
 }

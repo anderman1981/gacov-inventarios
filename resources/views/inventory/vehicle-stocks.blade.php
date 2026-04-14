@@ -18,6 +18,14 @@
                 <span class="badge badge-neutral">Unidades totales: {{ number_format($totalUnits, 0, ',', '.') }}</span>
             </div>
         </div>
+        <div class="inventory-hero__actions">
+            @can('inventory.load_vehicle_excel')
+            <a href="{{ route('inventory.vehicles.import.form') }}" class="btn btn-primary">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 2a1 1 0 01.894.553l2 4A1 1 0 0112 8h-1v5.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 111.414-1.414L9 13.586V8H8a1 1 0 01-.894-1.447l2-4A1 1 0 0110 2zM4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                Carga masiva por Excel
+            </a>
+            @endcan
+        </div>
     </div>
 </section>
 
@@ -88,6 +96,13 @@
                     <span class="badge {{ $route->vehicle_stocks->isNotEmpty() ? 'badge-info' : 'badge-neutral' }}">
                         {{ $route->vehicle_stocks->isNotEmpty() ? 'Inventario cargado' : 'Sin inventario inicial' }}
                     </span>
+                    @can('inventory.adjust')
+                    @if($route->vehicle_warehouse)
+                    <a href="{{ route('inventory.adjust', ['warehouse_id' => $route->vehicle_warehouse->id]) }}" class="badge badge-warning" style="text-decoration:none">
+                        {{ $route->vehicle_inventory_initialized ? 'Agregar mercancía' : 'Registrar carga inicial' }}
+                    </a>
+                    @endif
+                    @endcan
                 </div>
             </div>
 
