@@ -52,10 +52,10 @@ final class TenantPhaseActivationTest extends TestCase
             'current_period_end' => now()->addMonth(),
         ]);
 
-        TenantBillingProfile::create([
-            'tenant_id' => $tenant->id,
-            ...TenantBillingProfile::defaultPayload(1),
-        ]);
+        TenantBillingProfile::updateOrCreate(
+            ['tenant_id' => $tenant->id],
+            TenantBillingProfile::defaultPayload(1)
+        );
 
         $route = ClientRoute::factory()->create([
             'tenant_id' => $tenant->id,

@@ -13,6 +13,7 @@
 {{-- ── Acciones de cabecera por rol ─────────────────────────── --}}
 @section('header-actions')
     @if($isAdmin)
+        @can('transfers.create')
         @moduleEnabled('transfers')
         <a href="{{ route('transfers.create') }}" class="btn btn-primary btn-sm">
             <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
@@ -21,15 +22,19 @@
             Nueva orden de traslado
         </a>
         @endmoduleEnabled
+        @endcan
+        @can('inventory.adjust')
         @moduleEnabled('inventory')
-        <a href="{{ route('inventory.warehouse') }}" class="btn btn-secondary btn-sm">
+        <a href="{{ route('inventory.adjust') }}" class="btn btn-secondary btn-sm">
             <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
                 <path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 8a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"/>
             </svg>
             Ajuste de inventario
         </a>
         @endmoduleEnabled
+        @endcan
     @elseif($isContador)
+        @can('reports.worldoffice')
         @moduleEnabled('world_office')
         <a href="#" class="btn btn-primary btn-sm">
             <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
@@ -38,6 +43,8 @@
             Exportar WorldOffice
         </a>
         @endmoduleEnabled
+        @endcan
+        @can('movements.view')
         @moduleEnabled('reports')
         <a href="{{ route('inventory.movements') }}" class="btn btn-secondary btn-sm">
             <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
@@ -46,6 +53,7 @@
             Ver reportes
         </a>
         @endmoduleEnabled
+        @endcan
     @endif
 @endsection
 
@@ -74,34 +82,75 @@
     {{-- Acciones inline para pantallas medianas --}}
     <div class="page-header-actions" style="display:flex;gap:var(--space-3);flex-wrap:wrap;">
         @if($isAdmin)
+            @can('transfers.create')
             @moduleEnabled('transfers')
             <a href="{{ route('transfers.create') }}" class="btn btn-primary btn-sm">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
                 Nueva orden de traslado
             </a>
             @endmoduleEnabled
+            @endcan
+            @can('inventory.adjust')
             @moduleEnabled('inventory')
-            <a href="{{ route('inventory.warehouse') }}" class="btn btn-secondary btn-sm">
+            <a href="{{ route('inventory.adjust') }}" class="btn btn-secondary btn-sm">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 8a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
                 Ajuste de inventario
             </a>
             @endmoduleEnabled
+            @endcan
         @elseif($isContador)
+            @can('reports.worldoffice')
             @moduleEnabled('world_office')
             <a href="#" class="btn btn-primary btn-sm">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                 Exportar WorldOffice
             </a>
             @endmoduleEnabled
+            @endcan
+            @can('movements.view')
             @moduleEnabled('reports')
             <a href="{{ route('inventory.movements') }}" class="btn btn-secondary btn-sm">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd"/></svg>
                 Ver reportes
             </a>
             @endmoduleEnabled
+            @endcan
         @endif
     </div>
 </div>
+
+@if(in_array($role, ['admin', 'super_admin'], true) && isset($inventoryNotifications) && $inventoryNotifications->isNotEmpty())
+<div class="panel" style="margin-bottom:var(--space-6);border:1px solid rgba(245,158,11,.25)">
+    <div class="panel-header">
+        <span class="panel-title">Ajustes pendientes de revisión</span>
+        <span class="badge badge-warning">{{ $inventoryNotifications->count() }} nuevas</span>
+    </div>
+    <div class="panel-body" style="display:grid;gap:var(--space-4)">
+        @foreach($inventoryNotifications as $notification)
+            @php($payload = $notification->data)
+            <div style="padding:var(--space-4);border:1px solid var(--gacov-border);border-radius:var(--radius-lg);background:var(--gacov-bg-elevated)">
+                <div style="display:flex;justify-content:space-between;gap:var(--space-3);align-items:flex-start">
+                    <div>
+                        <strong>{{ $payload['title'] ?? 'Ajuste de inventario pendiente' }}</strong>
+                        <p style="margin-top:6px;color:var(--gacov-text-secondary)">{{ $payload['message'] ?? '' }}</p>
+                    </div>
+                    <span class="badge badge-neutral">{{ $notification->created_at?->diffForHumans() }}</span>
+                </div>
+                @if(!empty($payload['reason']))
+                <p style="margin-top:var(--space-3);font-size:13px;color:var(--gacov-text-secondary)">
+                    <strong>Observación:</strong> {{ $payload['reason'] }}
+                </p>
+                @endif
+                <div style="margin-top:var(--space-3)">
+                    <a href="{{ $payload['action_url'] ?? route('inventory.movements') }}" class="btn btn-secondary btn-sm" style="width:auto">
+                        Revisar movimientos
+                    </a>
+                </div>
+            </div>
+        @endforeach
+    </div>
+</div>
+@endif
 
 {{-- ════════════════════════════════════════════════════════════ --}}
 {{-- ADMIN / MANAGER — Dashboard completo                        --}}
@@ -250,6 +299,7 @@
     </div>
 
     {{-- Traslados pendientes --}}
+    @can('transfers.view')
     @moduleEnabled('transfers')
     @if(isset($pendingTransfers) && $pendingTransfers->isNotEmpty())
     <div class="panel" style="margin-top:var(--space-6)">
@@ -284,6 +334,7 @@
     </div>
     @endif
     @endmoduleEnabled
+    @endcan
 
 {{-- ════════════════════════════════════════════════════════════ --}}
 {{-- CONTADOR — Dashboard financiero                             --}}
@@ -337,9 +388,11 @@
         <div class="panel">
             <div class="panel-header">
                 <span class="panel-title">Movimientos del mes</span>
+                @can('movements.view')
                 @moduleEnabled('reports')
                 <a href="{{ route('inventory.movements') }}" class="btn btn-secondary btn-sm">Ver completo</a>
                 @endmoduleEnabled
+                @endcan
             </div>
             @if(isset($recentMovements) && $recentMovements->isNotEmpty())
             <table class="data-table">
@@ -375,24 +428,30 @@
                 <span class="panel-title">Accesos rápidos</span>
             </div>
             <div class="panel-body" style="display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4)">
+                @can('reports.worldoffice')
                 @moduleEnabled('world_office')
                 <a href="#" class="btn btn-primary" style="justify-content:flex-start;gap:var(--space-3)">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                     Exportar WorldOffice
                 </a>
                 @endmoduleEnabled
+                @endcan
+                @can('movements.view')
                 @moduleEnabled('reports')
                 <a href="{{ route('inventory.movements') }}" class="btn btn-secondary" style="justify-content:flex-start;gap:var(--space-3)">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd"/></svg>
                     Ver reportes completos
                 </a>
                 @endmoduleEnabled
+                @endcan
+                @can('inventory.view')
                 @moduleEnabled('inventory')
                 <a href="{{ route('inventory.warehouse') }}" class="btn btn-secondary" style="justify-content:flex-start;gap:var(--space-3)">
                     <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 8a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
                     Ver inventario bodega
                 </a>
                 @endmoduleEnabled
+                @endcan
             </div>
         </div>
 

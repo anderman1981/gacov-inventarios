@@ -8,6 +8,7 @@ use App\Domain\Tenant\Services\TenantContext;
 use App\Models\AppModule;
 use Closure;
 use Illuminate\Http\Request;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -23,7 +24,7 @@ final class RequireModuleAccess
     {
         // 1. Verificar que el módulo existe y está disponible para la fase del tenant
         if (! $this->tenantContext->canAccessModule($moduleKey)) {
-            return $this->denyAccess($request, $moduleKey, 'Este módulo no está disponible en la fase activa de tu cliente.');
+            return $this->denyAccess($request, $moduleKey, 'Este módulo no está disponible en la fase activa de tu cliente.', true);
         }
 
         // 2. Verificar que el usuario tiene permiso de ver este módulo
@@ -37,7 +38,7 @@ final class RequireModuleAccess
 
     /**
      * Verifica si el usuario tiene el permiso de ver el módulo.
-     * El permiso sigue el formato: {module_key}.view
+     * El permiso sigue el formato: {module_key}.view o {module_key}.own
      */
     private function userHasModulePermission(string $moduleKey): bool
     {
@@ -52,16 +53,33 @@ final class RequireModuleAccess
             return true;
         }
 
-        // Verificar permiso específico del módulo
-        $permission = "{$moduleKey}.view";
+        // Dashboard permite tanto full como own.
+        if ($moduleKey === 'dashboard') {
+            $hasFull = $this->userHasPermission($user, 'dashboard.full');
+            $hasOwn = $this->userHasPermission($user, 'dashboard.own');
 
-        return $user->hasPermissionTo($permission);
+            return $hasFull || $hasOwn;
+        }
+
+        return $this->userHasPermission($user, "{$moduleKey}.view");
+    }
+
+    /**
+     * Verifica si el usuario tiene un permiso específico (sin lanzar excepción).
+     */
+    private function userHasPermission($user, string $permission): bool
+    {
+        try {
+            return $user->hasPermissionTo($permission);
+        } catch (PermissionDoesNotExist) {
+            return false;
+        }
     }
 
     /**
      * Maneja el acceso denegado.
      */
-    private function denyAccess(Request $request, string $moduleKey, string $message): Response
+    private function denyAccess(Request $request, string $moduleKey, string $message, bool $phaseLocked = false): Response
     {
         $module = AppModule::query()->where('key', $moduleKey)->first();
 
@@ -72,6 +90,21 @@ final class RequireModuleAccess
                 'required_phase' => $module?->phase_required,
                 'current_phase' => $this->tenantContext->currentPhase(),
             ], 403);
+        }
+
+        // Si es dashboard y el usuario es conductor, redirigir a su dashboard
+        $user = auth()->user();
+        if ($moduleKey === 'dashboard' && $user?->hasRole('conductor')) {
+            return redirect()->route('driver.dashboard')
+                ->with('info', 'Redirigiendo a tu panel de conductor.');
+        }
+
+        if ($phaseLocked && $module !== null) {
+            return redirect()->route('subscription.upgrade')
+                ->with('module_required', $moduleKey)
+                ->with('module_required_phase', $module->phase_required)
+                ->with('module_current_phase', $this->tenantContext->currentPhase())
+                ->with('error', $message);
         }
 
         // Redirigir con mensaje de error

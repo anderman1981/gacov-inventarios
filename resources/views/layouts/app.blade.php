@@ -219,10 +219,11 @@
                     || str_starts_with($route,'inventory.warehouse')
                     || str_starts_with($route,'inventory.adjust')
                     || str_starts_with($route,'inventory.import')
-                    || $route === 'inventory.vehicles'
+                    || str_starts_with($route,'inventory.vehicles')
                     || $route === 'inventory.machines';
             @endphp
             @moduleEnabled('inventory')
+            @canany(['inventory.view', 'inventory.adjust', 'inventory.load_excel', 'products.view', 'machines.view'])
             <div class="nav-section">Inventario</div>
 
             <a href="{{ route('inventory.warehouse') }}" class="nav-item {{ $isInventorySection ? 'active' : '' }}">
@@ -237,58 +238,90 @@
             @if($isInventorySection)
             <div class="nav-sub-group">
                 @moduleEnabled('products')
+                @can('products.view')
                 <a href="{{ route('products.index') }}" class="nav-sub-item {{ str_starts_with($route,'products') ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Productos
                 </a>
+                @endcan
                 @endmoduleEnabled
+                @can('inventory.view')
                 <a href="{{ route('inventory.warehouse') }}" class="nav-sub-item {{ ($route === 'inventory.warehouse' || str_starts_with($route,'inventory.adjust') || str_starts_with($route,'inventory.import')) ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Bodega Principal
                 </a>
-                <a href="{{ route('inventory.vehicles') }}" class="nav-sub-item {{ $route === 'inventory.vehicles' ? 'active' : '' }}">
+                @endcan
+                @can('inventory.view')
+                <a href="{{ route('inventory.vehicles') }}" class="nav-sub-item {{ str_starts_with($route,'inventory.vehicles') ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Vehículos
                 </a>
+                @endcan
+                @can('machines.view')
                 @moduleEnabled('machines')
                 <a href="{{ route('inventory.machines') }}" class="nav-sub-item {{ $route === 'inventory.machines' ? 'active' : '' }}">
                     <span class="nav-sub-dot"></span> Máquinas
                 </a>
                 @endmoduleEnabled
+                @endcan
             </div>
             @endif
+            @endcanany
             @endmoduleEnabled
 
             {{-- Rutas y Máquinas --}}
             <div class="nav-section">Operaciones</div>
 
+            @can('transfers.view')
             @moduleEnabled('transfers')
             <a href="{{ route('transfers.index') }}" class="nav-item {{ str_starts_with($route,'transfers') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 5a1 1 0 100 2h5.586l-1.293 1.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L13.586 5H8zM12 15a1 1 0 100-2H6.414l1.293-1.293a1 1 0 10-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L6.414 15H12z"/></svg>
                 <span>Traslados</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
+            @can('drivers.assign_routes')
+            @moduleEnabled('drivers')
+            <a href="{{ route('operations.routes.board') }}" class="nav-item {{ str_starts_with($route,'operations.routes') ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 4a3 3 0 110 6 3 3 0 010-6zm6 1a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L16.586 5H13zM7 12c-3.314 0-6 2.015-6 4.5a1 1 0 001 1h10a1 1 0 001-1C13 14.015 10.314 12 7 12zm7 0a3 3 0 100 6 3 3 0 000-6z"/></svg>
+                <span>Rutas y conductores</span>
+            </a>
+            @endmoduleEnabled
+            @endcan
+
+            @can('stockings.create')
             @moduleEnabled('drivers')
             <a href="{{ route('driver.stocking.create') }}" class="nav-item {{ str_starts_with($route,'driver.stocking') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>
                 <span>Surtido Máquinas</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
+            @can('machines.view')
             @moduleEnabled('machines')
             <a href="{{ route('machines.index') }}" class="nav-item {{ str_starts_with($route,'machines') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
                 <span>Máquinas</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
+            @can('sales.create')
             @moduleEnabled('sales')
             <a href="{{ route('driver.sales.create') }}" class="nav-item {{ str_starts_with($route,'driver.sales') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
                 <span>Ventas Máquinas</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
             {{-- Reportes --}}
+            @if(
+                app(\App\Domain\Tenant\Services\TenantContext::class)->canAccessModule('invoices')
+                || auth()->user()?->can('reports.worldoffice')
+                || auth()->user()?->can('movements.view')
+            )
             <div class="nav-section">Reportes</div>
+            @endif
 
             @moduleEnabled('invoices')
             <a href="{{ route('invoices.index') }}" class="nav-item {{ str_starts_with($route,'invoices') ? 'active' : '' }}">
@@ -297,19 +330,23 @@
             </a>
             @endmoduleEnabled
 
+            @can('reports.worldoffice')
             @moduleEnabled('world_office')
             <a href="#" class="nav-item {{ str_starts_with($route,'worldoffice') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                 <span>Exportar WorldOffice</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
+            @can('movements.view')
             @moduleEnabled('reports')
             <a href="{{ route('inventory.movements') }}" class="nav-item {{ str_starts_with($route,'inventory.movements') ? 'active' : '' }}">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd"/></svg>
                 <span>Reportes</span>
             </a>
             @endmoduleEnabled
+            @endcan
 
             {{-- Admin --}}
             @moduleEnabled('users')
@@ -429,6 +466,7 @@
 
 @if($isDriverRoute)
 <nav class="driver-mobile-nav" aria-label="Navegación conductor">
+    @can('stockings.create')
     @moduleEnabled('drivers')
     <a href="{{ route('driver.dashboard', $driverRouteQuery) }}" class="driver-mobile-nav__item {{ str_starts_with($routeName, 'driver.dashboard') ? 'active' : '' }}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/></svg>
@@ -439,18 +477,23 @@
         <span>Surtido</span>
     </a>
     @endmoduleEnabled
+    @endcan
+    @can('sales.create')
     @moduleEnabled('sales')
     <a href="{{ route('driver.sales.create', $driverRouteQuery) }}" class="driver-mobile-nav__item {{ str_starts_with($routeName, 'driver.sales') ? 'active' : '' }}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
         <span>Ventas</span>
     </a>
     @endmoduleEnabled
+    @endcan
+    @can('vehicle.inventory.view')
     @moduleEnabled('inventory')
     <a href="{{ route('driver.inventory', $driverRouteQuery) }}" class="driver-mobile-nav__item {{ str_starts_with($routeName, 'driver.inventory') ? 'active' : '' }}">
         <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 8a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
         <span>Vehículo</span>
     </a>
     @endmoduleEnabled
+    @endcan
 </nav>
 @endif
 
@@ -723,16 +766,44 @@ window.addEventListener('appinstalled', () => {
     console.log('✅ PWA instalada correctamente');
 });
 
-// Registrar Service Worker
+// Registrar Service Worker solo en producción real.
+const shouldRegisterServiceWorker = @json(app()->environment('production') && request()->getHost() === 'gacov.webtechnology.com.co');
+const serviceWorkerCachePrefix = 'gacov-';
+
+async function clearServiceWorkerState() {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+
+    if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(
+            cacheKeys
+                .filter((key) => key.startsWith(serviceWorkerCachePrefix))
+                .map((key) => caches.delete(key))
+        );
+    }
+}
+
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-                console.log('✅ Service Worker registrado:', registration.scope);
-            })
-            .catch((error) => {
-                console.log('❌ Error al registrar Service Worker:', error);
-            });
+    window.addEventListener('load', async () => {
+        if (!shouldRegisterServiceWorker) {
+            try {
+                await clearServiceWorkerState();
+                console.log('ℹ️ Service Worker deshabilitado para este entorno');
+            } catch (error) {
+                console.log('⚠️ No fue posible limpiar el Service Worker:', error);
+            }
+
+            return;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            await registration.update();
+            console.log('✅ Service Worker registrado:', registration.scope);
+        } catch (error) {
+            console.log('❌ Error al registrar Service Worker:', error);
+        }
     });
 }
 </script>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Support\Auth\RolePermissionMatrix;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -18,122 +19,14 @@ final class RoleSeeder extends Seeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // ── Permisos granulares ───────────────────────────────────────────
-        $permissions = [
-            // Sistema
-            'system.modules',       // instalar/configurar módulos (solo super_admin)
-            'system.develop',       // acceso a herramientas de desarrollo (solo super_admin)
-
-            // Usuarios
-            'users.view',
-            'users.create',
-            'users.edit',
-            'users.delete',
-            'users.assign_roles',
-
-            // Roles y permisos
-            'roles.view',
-            'roles.manage',
-
-            // Productos y categorías
-            'products.view',
-            'products.create',
-            'products.edit',
-            'products.delete',
-            'products.import',
-
-            // Máquinas
-            'machines.view',
-            'machines.create',
-            'machines.edit',
-            'machines.delete',
-
-            // Inventario bodega
-            'inventory.view',
-            'inventory.load_excel',
-            'inventory.adjust',
-
-            // Movimientos (historial)
-            'movements.view',
-
-            // Traslados
-            'transfers.view',
-            'transfers.create',
-            'transfers.approve',
-            'transfers.complete',
-
-            // Surtido (conductor)
-            'stockings.view',
-            'stockings.create',
-            'stockings.own',         // solo ve sus propios surtidos
-
-            // Ventas máquinas (conductor)
-            'sales.view',
-            'sales.create',
-            'sales.own',             // solo registra en sus máquinas
-
-            // Reportes
-            'reports.view',
-            'reports.export_excel',
-            'reports.worldoffice',
-
-            // Dashboard
-            'dashboard.full',       // KPIs completos
-            'dashboard.own',        // solo vista de su ruta
-        ];
+        $permissions = RolePermissionMatrix::permissions();
 
         foreach ($permissions as $perm) {
             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
         }
 
         // ── Definición de roles y sus permisos ────────────────────────────
-        $rolePermissions = [
-
-            'super_admin' => $permissions, // TODO sin excepción
-
-            'admin' => [
-                'users.view', 'users.create', 'users.edit', 'users.delete', 'users.assign_roles',
-                'roles.view', 'roles.manage',
-                'products.view', 'products.create', 'products.edit', 'products.delete', 'products.import',
-                'machines.view', 'machines.create', 'machines.edit', 'machines.delete',
-                'inventory.view', 'inventory.load_excel', 'inventory.adjust',
-                'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.complete',
-                'stockings.view',
-                'sales.view',
-                'reports.view', 'reports.export_excel', 'reports.worldoffice',
-                'dashboard.full',
-            ],
-
-            'manager' => [
-                'products.view', 'products.create', 'products.edit',
-                'machines.view', 'machines.create', 'machines.edit',
-                'inventory.view', 'inventory.adjust',
-                'transfers.view', 'transfers.create', 'transfers.approve',
-                'stockings.view',
-                'sales.view',
-                'reports.view', 'reports.export_excel',
-                'dashboard.full',
-            ],
-
-            'contador' => [
-                'products.view',
-                'machines.view',
-                'inventory.view',
-                'transfers.view',
-                'stockings.view',
-                'sales.view',
-                'reports.view', 'reports.export_excel', 'reports.worldoffice',
-                'dashboard.full',
-            ],
-
-            'conductor' => [
-                'machines.view',
-                'inventory.view',
-                'transfers.view',
-                'stockings.view', 'stockings.create', 'stockings.own',
-                'sales.view', 'sales.create', 'sales.own',
-                'dashboard.own',
-            ],
-        ];
+        $rolePermissions = RolePermissionMatrix::rolePermissions();
 
         foreach ($rolePermissions as $roleName => $perms) {
             $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);

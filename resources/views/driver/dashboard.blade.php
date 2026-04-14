@@ -1,6 +1,40 @@
 @extends('layouts.app')
 @section('title', 'Mi Ruta')
 
+@push('styles')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+    #driver-map {
+        height: 300px;
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-5);
+    }
+    .machine-popup-content {
+        min-width: 180px;
+    }
+    .machine-popup-content h4 {
+        margin: 0 0 6px 0;
+        font-size: 14px;
+        color: #1a1a2e;
+    }
+    .machine-popup-content p {
+        margin: 0 0 4px 0;
+        font-size: 12px;
+        color: #555;
+    }
+    .machine-popup-content .stock-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .stock-badge.good { background: #d1fae5; color: #065f46; }
+    .stock-badge.low { background: #fef3c7; color: #92400e; }
+    .stock-badge.critical { background: #fee2e2; color: #991b1b; }
+</style>
+@endpush
+
 @section('content')
 @php($routeQuery = $route?->id ? ['route_id' => $route->id] : [])
 <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">
@@ -105,6 +139,19 @@
     </div>
 </div>
 
+{{-- Mapa de máquinas --}}
+@if($machines->isNotEmpty() && $machines->contains(fn($m) => $m->latitude && $m->longitude))
+<div class="panel" style="margin-bottom:var(--space-8)">
+    <div class="panel-header">
+        <span class="panel-title">Ubicación de máquinas</span>
+        <span class="badge badge-info">{{ $machines->filter(fn($m) => $m->latitude && $m->longitude)->count() }} máquinas con GPS</span>
+    </div>
+    <div class="panel-body">
+        <div id="driver-map"></div>
+    </div>
+</div>
+@endif
+
 {{-- Lista de máquinas --}}
 <div class="panel">
     <div class="panel-header">
@@ -183,3 +230,94 @@
     @endif
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Datos de máquinas con coordenadas
+    const machinesWithCoords = [
+        @foreach($machines->filter(fn($m) => $m->latitude && $m->longitude) as $machine)
+        {
+            id: {{ $machine->id }},
+            code: "{{ $machine->code }}",
+            name: "{{ $machine->name }}",
+            location: "{{ $machine->location ?? 'Sin ubicación' }}",
+            latitude: {{ $machine->latitude }},
+            longitude: {{ $machine->longitude }},
+            stock: {{ $machine->total_stock ?? 0 }},
+            stockStatus: "{{ $machine->total_stock < 10 ? 'critical' : ($machine->total_stock < 30 ? 'low' : 'good') }}"
+        },
+        @endforeach
+    ];
+
+    if (machinesWithCoords.length === 0) {
+        return;
+    }
+
+    // Inicializar mapa centrado en la primera máquina
+    const firstMachine = machinesWithCoords[0];
+    const map = L.map('driver-map').setView([firstMachine.latitude, firstMachine.longitude], 13);
+
+    // Capa de OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Icono personalizado para máquinas
+    function createMachineIcon(stockStatus) {
+        const color = stockStatus === 'critical' ? '#ef4444' : (stockStatus === 'low' ? '#f59e0b' : '#10b981');
+        return L.divIcon({
+            className: 'machine-marker',
+            html: `<div style="
+                background:${color};
+                width:32px;
+                height:32px;
+                border-radius:50%;
+                border:3px solid white;
+                box-shadow:0 2px 8px rgba(0,0,0,0.3);
+                display:flex;
+                align-items:center;
+                justify-content:center;
+            ">
+                <svg viewBox="0 0 20 20" fill="white" width="16" height="16">
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8 7.5a1.5 1.5 0 113 0V11a1 1 0 01-2 0V7.5zM8 13a1 1 0 100-2 1 1 0 000 2z"/>
+                </svg>
+            </div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            popupAnchor: [0, -16]
+        });
+    }
+
+    // Agregar marcadores
+    let bounds = L.latLngBounds([]);
+    machinesWithCoords.forEach(function(machine) {
+        const stockLabel = machine.stockStatus === 'critical' ? 'Necesita surtido' :
+                          (machine.stockStatus === 'low' ? 'Stock bajo' : 'Bien surtida');
+
+        const popupContent = `
+            <div class="machine-popup-content">
+                <h4>${machine.code} — ${machine.name}</h4>
+                <p><strong>Ubicación:</strong> ${machine.location}</p>
+                <p><strong>Stock:</strong> ${machine.stock} uds.</p>
+                <span class="stock-badge ${machine.stockStatus}">${stockLabel}</span>
+            </div>
+        `;
+
+        const marker = L.marker([machine.latitude, machine.longitude], {
+            icon: createMachineIcon(machine.stockStatus)
+        }).addTo(map);
+
+        marker.bindPopup(popupContent);
+        bounds.extend([machine.latitude, machine.longitude]);
+    });
+
+    // Ajustar vista para mostrar todos los marcadores
+    if (machinesWithCoords.length > 1) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+    }
+});
+</script>
+@endpush

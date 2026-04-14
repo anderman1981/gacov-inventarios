@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Inventory;
 
+use App\Models\Machine;
 use App\Models\Product;
+use App\Models\Route;
 use App\Models\Stock;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Notifications\InventoryAdjustmentNotification;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 final class InventoryWarehouseTest extends TestCase
@@ -15,6 +19,8 @@ final class InventoryWarehouseTest extends TestCase
     private User $adminUser;
 
     private User $viewerUser;
+
+    private User $managerUser;
 
     private Warehouse $warehouse;
 
@@ -24,13 +30,22 @@ final class InventoryWarehouseTest extends TestCase
 
         // Crear usuarios con diferentes permisos (super_admin para evitar middleware blocking)
         $this->adminUser = User::factory()->create(['is_super_admin' => true]);
+        $this->adminUser->syncRoles(['admin']);
         $this->adminUser->givePermissionTo('inventory.view');
         $this->adminUser->givePermissionTo('inventory.adjust');
         $this->adminUser->givePermissionTo('movements.view');
         $this->adminUser->givePermissionTo('inventory.load_excel');
+        $this->adminUser->givePermissionTo('inventory.load_machine_excel');
 
         $this->viewerUser = User::factory()->create(['is_super_admin' => true]);
         $this->viewerUser->givePermissionTo('inventory.view');
+
+        $this->managerUser = User::factory()->create(['is_super_admin' => true]);
+        $this->managerUser->syncRoles(['manager']);
+        $this->managerUser->givePermissionTo('inventory.view');
+        $this->managerUser->givePermissionTo('inventory.adjust');
+        $this->managerUser->givePermissionTo('inventory.load_vehicle_excel');
+        $this->managerUser->givePermissionTo('inventory.load_machine_excel');
 
         // Crear bodega principal
         $this->warehouse = Warehouse::factory()->create([
@@ -277,6 +292,102 @@ final class InventoryWarehouseTest extends TestCase
         $response->assertViewIs('inventory.adjust');
     }
 
+    public function test_manager_can_open_vehicle_adjust_form(): void
+    {
+        $route = Route::factory()->create();
+        $vehicleWarehouse = Warehouse::factory()->vehiculo()->create([
+            'route_id' => $route->id,
+        ]);
+
+        $response = $this->actingAs($this->managerUser)
+            ->get(route('inventory.adjust', ['warehouse_id' => $vehicleWarehouse->id]));
+
+        $response->assertOk();
+        $response->assertSee('Carga de mercancía para vehículo');
+        $response->assertSee($vehicleWarehouse->name);
+    }
+
+    public function test_manager_can_view_vehicle_inventory_cards_with_adjustment_actions(): void
+    {
+        $route = Route::factory()->create([
+            'name' => 'Ruta Norte',
+            'code' => 'RN-01',
+        ]);
+        $vehicleWarehouse = Warehouse::factory()->vehiculo()->create([
+            'route_id' => $route->id,
+            'name' => 'Vehiculo Ruta Norte',
+        ]);
+        $product = Product::factory()->create([
+            'name' => 'Agua 600ML',
+        ]);
+
+        Stock::factory()->create([
+            'warehouse_id' => $vehicleWarehouse->id,
+            'product_id' => $product->id,
+            'quantity' => 24,
+        ]);
+
+        $response = $this->actingAs($this->managerUser)
+            ->get(route('inventory.vehicles'));
+
+        $response->assertOk();
+        $response->assertSee('Ruta Norte');
+        $response->assertSee('Agregar mercancía');
+        $response->assertSee('Carga masiva por Excel');
+        $response->assertSee('Agua 600ML');
+    }
+
+    public function test_manager_can_view_machine_inventory_cards_with_adjustment_actions(): void
+    {
+        $route = Route::factory()->create();
+        $machine = Machine::factory()->forRoute($route->id)->create([
+            'name' => 'Maquina Central',
+            'code' => 'MC-01',
+        ]);
+        $machineWarehouse = Warehouse::factory()->maquina()->create([
+            'machine_id' => $machine->id,
+            'name' => 'Bodega Maquina Central',
+        ]);
+        $product = Product::factory()->create([
+            'name' => 'Cafe Latte',
+        ]);
+
+        Stock::factory()->create([
+            'warehouse_id' => $machineWarehouse->id,
+            'product_id' => $product->id,
+            'quantity' => 12,
+        ]);
+
+        $response = $this->actingAs($this->managerUser)
+            ->get(route('inventory.machines'));
+
+        $response->assertOk();
+        $response->assertSee('Maquina Central');
+        $response->assertSee('Corregir inventario');
+        $response->assertSee('Carga masiva cerrada');
+        $response->assertSee('Cafe Latte');
+    }
+
+    public function test_manager_can_view_machine_mass_initial_button_when_pending_initial_load_exists(): void
+    {
+        $route = Route::factory()->create();
+        $machine = Machine::factory()->forRoute($route->id)->create([
+            'name' => 'Maquina Nueva',
+            'code' => 'MN-01',
+        ]);
+
+        Warehouse::factory()->maquina()->create([
+            'machine_id' => $machine->id,
+            'name' => 'Bodega Maquina Nueva',
+        ]);
+
+        $response = $this->actingAs($this->managerUser)
+            ->get(route('inventory.machines'));
+
+        $response->assertOk();
+        $response->assertSee('Carga inicial por Excel');
+    }
+
     public function test_adjust_stock_creates_movement(): void
     {
         $product = Product::factory()->create();
@@ -337,6 +448,160 @@ final class InventoryWarehouseTest extends TestCase
             'movement_type' => 'ajuste_manual',
             'quantity' => 20, // 30 - 50 = -20, abs = 20
         ]);
+    }
+
+    public function test_machine_initial_load_is_recorded_without_required_reason(): void
+    {
+        Notification::fake();
+
+        $route = Route::factory()->create();
+        $machine = Machine::factory()->forRoute($route->id)->create();
+        $machineWarehouse = Warehouse::factory()->maquina()->create([
+            'machine_id' => $machine->id,
+        ]);
+        $product = Product::factory()->create();
+
+        $response = $this->actingAs($this->managerUser)
+            ->post(route('inventory.adjust.store'), [
+                'warehouse_id' => $machineWarehouse->id,
+                'product_id' => $product->id,
+                'new_quantity' => 18,
+                'reason' => '',
+            ]);
+
+        $response->assertRedirect(route('inventory.machines'));
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('stock_movements', [
+            'destination_warehouse_id' => $machineWarehouse->id,
+            'product_id' => $product->id,
+            'movement_type' => 'carga_inicial',
+            'quantity' => 18,
+        ]);
+        Notification::assertNothingSent();
+    }
+
+    public function test_vehicle_initial_load_is_recorded_without_required_reason(): void
+    {
+        Notification::fake();
+
+        $route = Route::factory()->create();
+        $vehicleWarehouse = Warehouse::factory()->vehiculo()->create([
+            'route_id' => $route->id,
+        ]);
+        $product = Product::factory()->create();
+
+        $response = $this->actingAs($this->managerUser)
+            ->post(route('inventory.adjust.store'), [
+                'warehouse_id' => $vehicleWarehouse->id,
+                'product_id' => $product->id,
+                'new_quantity' => 20,
+                'reason' => '',
+            ]);
+
+        $response->assertRedirect(route('inventory.vehicles'));
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('stock_movements', [
+            'destination_warehouse_id' => $vehicleWarehouse->id,
+            'product_id' => $product->id,
+            'movement_type' => 'carga_inicial',
+            'quantity' => 20,
+        ]);
+        Notification::assertNothingSent();
+    }
+
+    public function test_manager_adjustment_after_initial_load_requires_reason_and_notifies_admin(): void
+    {
+        Notification::fake();
+
+        $route = Route::factory()->create();
+        $machine = Machine::factory()->forRoute($route->id)->create();
+        $machineWarehouse = Warehouse::factory()->maquina()->create([
+            'machine_id' => $machine->id,
+        ]);
+        $product = Product::factory()->create();
+
+        Stock::factory()->create([
+            'warehouse_id' => $machineWarehouse->id,
+            'product_id' => $product->id,
+            'quantity' => 10,
+        ]);
+
+        $this->actingAs($this->managerUser)
+            ->post(route('inventory.adjust.store'), [
+                'warehouse_id' => $machineWarehouse->id,
+                'product_id' => $product->id,
+                'new_quantity' => 15,
+                'reason' => '',
+            ])
+            ->assertSessionHasErrors('reason');
+
+        $response = $this->actingAs($this->managerUser)
+            ->post(route('inventory.adjust.store'), [
+                'warehouse_id' => $machineWarehouse->id,
+                'product_id' => $product->id,
+                'new_quantity' => 15,
+                'reason' => 'Se corrigió diferencia detectada en el conteo de la máquina.',
+            ]);
+
+        $response->assertRedirect(route('inventory.machines'));
+        $this->assertDatabaseHas('stock_movements', [
+            'destination_warehouse_id' => $machineWarehouse->id,
+            'product_id' => $product->id,
+            'movement_type' => 'ajuste_manual',
+            'quantity' => 5,
+        ]);
+        Notification::assertSentTo(
+            $this->adminUser,
+            InventoryAdjustmentNotification::class,
+            fn (InventoryAdjustmentNotification $notification, array $channels): bool => in_array('database', $channels, true)
+        );
+    }
+
+    public function test_manager_vehicle_adjustment_after_initial_load_requires_reason_and_notifies_admin(): void
+    {
+        Notification::fake();
+
+        $route = Route::factory()->create();
+        $vehicleWarehouse = Warehouse::factory()->vehiculo()->create([
+            'route_id' => $route->id,
+        ]);
+        $product = Product::factory()->create();
+
+        Stock::factory()->create([
+            'warehouse_id' => $vehicleWarehouse->id,
+            'product_id' => $product->id,
+            'quantity' => 8,
+        ]);
+
+        $this->actingAs($this->managerUser)
+            ->post(route('inventory.adjust.store'), [
+                'warehouse_id' => $vehicleWarehouse->id,
+                'product_id' => $product->id,
+                'new_quantity' => 11,
+                'reason' => '',
+            ])
+            ->assertSessionHasErrors('reason');
+
+        $response = $this->actingAs($this->managerUser)
+            ->post(route('inventory.adjust.store'), [
+                'warehouse_id' => $vehicleWarehouse->id,
+                'product_id' => $product->id,
+                'new_quantity' => 11,
+                'reason' => 'Se ajustó el inventario del vehículo por diferencia encontrada al cierre de ruta.',
+            ]);
+
+        $response->assertRedirect(route('inventory.vehicles'));
+        $this->assertDatabaseHas('stock_movements', [
+            'destination_warehouse_id' => $vehicleWarehouse->id,
+            'product_id' => $product->id,
+            'movement_type' => 'ajuste_manual',
+            'quantity' => 3,
+        ]);
+        Notification::assertSentTo(
+            $this->adminUser,
+            InventoryAdjustmentNotification::class,
+            fn (InventoryAdjustmentNotification $notification, array $channels): bool => in_array('database', $channels, true)
+        );
     }
 
     // ============================================================

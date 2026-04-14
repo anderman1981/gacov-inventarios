@@ -78,6 +78,7 @@ final class UserController extends Controller
         ]);
 
         $user->syncRoles([$data['role']]);
+        $this->syncConductorRouteAssignments($user, $data['role'] === 'conductor' ? ($data['route_id'] ?? null) : null);
 
         return redirect()
             ->route('admin.users.index')
@@ -133,6 +134,7 @@ final class UserController extends Controller
 
         // Sincronizar rol si cambió
         $user->syncRoles([$data['role']]);
+        $this->syncConductorRouteAssignments($user, $data['role'] === 'conductor' ? ($data['route_id'] ?? null) : null);
 
         return redirect()
             ->route('admin.users.index')
@@ -195,5 +197,36 @@ final class UserController extends Controller
     public function accessProfiles(): View
     {
         return view('pages.acceso-por-perfil');
+    }
+
+    private function syncConductorRouteAssignments(User $user, ?int $routeId): void
+    {
+        Route::query()
+            ->where('driver_user_id', $user->id)
+            ->when($routeId !== null, fn ($query) => $query->where('id', '!=', $routeId))
+            ->update(['driver_user_id' => null]);
+
+        if ($routeId === null) {
+            return;
+        }
+
+        $currentDriverId = Route::query()
+            ->whereKey($routeId)
+            ->value('driver_user_id');
+
+        if ($currentDriverId !== null && $currentDriverId !== $user->id) {
+            User::query()
+                ->whereKey($currentDriverId)
+                ->update(['route_id' => null]);
+        }
+
+        User::query()
+            ->where('route_id', $routeId)
+            ->where('id', '!=', $user->id)
+            ->update(['route_id' => null]);
+
+        Route::query()
+            ->whereKey($routeId)
+            ->update(['driver_user_id' => $user->id]);
     }
 }

@@ -60,6 +60,8 @@ final class StockingPhotoImport extends Component
 
     public function mount(?int $routeId = null): void
     {
+        $this->ensurePhotoImportAvailable();
+
         $user = auth()->user();
         $route = $routeId !== null
             ? Route::query()->whereKey($routeId)->where('is_active', true)->first()
@@ -289,7 +291,13 @@ final class StockingPhotoImport extends Component
 
     private function authorizeUsage(): void
     {
+        $this->ensurePhotoImportAvailable();
         abort_unless(auth()->user()?->can('stockings.create'), 403);
+    }
+
+    private function ensurePhotoImportAvailable(): void
+    {
+        abort_if(auth()->user()?->hasRole('conductor') ?? false, 403);
     }
 
     /**

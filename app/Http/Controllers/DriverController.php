@@ -15,7 +15,9 @@ use App\Models\MachineStockingRecord;
 use App\Models\Product;
 use App\Models\Route;
 use App\Models\Stock;
+use App\Models\User;
 use App\Models\Warehouse;
+use App\Support\Routes\RouteScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -26,11 +28,14 @@ final class DriverController extends Controller
     public function __construct(
         private readonly RegisterStocking $registerStocking,
         private readonly RegisterSale $registerSale,
+        private readonly RouteScheduleService $routeScheduleService,
     ) {}
 
     public function dashboard(Request $request): View
     {
         $user = auth()->user();
+        abort_unless($user?->isSuperAdmin() || $user?->can('dashboard.own'), 403);
+
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
 
@@ -76,6 +81,8 @@ final class DriverController extends Controller
 
     public function stocking(Request $request): View
     {
+        abort_unless(auth()->user()?->can('stockings.create'), 403);
+
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
 
@@ -134,6 +141,11 @@ final class DriverController extends Controller
             return back()->withInput()->with('error', 'Debe ingresar al menos un producto con cantidad mayor a cero.');
         }
 
+        // Extraer datos de geolocalización
+        $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
+        $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
+        $geolocationAccuracy = $request->input('geolocation_accuracy');
+
         try {
             $this->registerStocking->handle(
                 user: $user,
@@ -143,6 +155,9 @@ final class DriverController extends Controller
                 machineWarehouse: $machineWarehouse,
                 items: $items,
                 notes: $request->input('notes'),
+                latitude: $latitude,
+                longitude: $longitude,
+                geolocationAccuracy: $geolocationAccuracy,
             );
         } catch (\RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
@@ -154,6 +169,8 @@ final class DriverController extends Controller
 
     public function sales(Request $request): View
     {
+        abort_unless(auth()->user()?->can('sales.create'), 403);
+
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
 
@@ -211,6 +228,8 @@ final class DriverController extends Controller
 
     public function vehicleInventory(Request $request): View
     {
+        abort_unless(auth()->user()?->can('vehicle.inventory.view'), 403);
+
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
 
@@ -240,14 +259,28 @@ final class DriverController extends Controller
     {
         $user = auth()->user();
 
-        if ($routeId && $this->canSelectRoute()) {
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        if ($routeId && $this->canManageAnyRoute($user)) {
             return Route::query()
                 ->whereKey($routeId)
                 ->where('is_active', true)
                 ->first();
         }
 
-        return $user?->route;
+        if ($this->canManageAnyRoute($user)) {
+            return $user->route;
+        }
+
+        $availableRoutes = $this->routeScheduleService->availableRoutesForUser($user, today());
+
+        if ($routeId) {
+            return $availableRoutes->firstWhere('id', $routeId) ?? $availableRoutes->first();
+        }
+
+        return $availableRoutes->first();
     }
 
     /**
@@ -255,24 +288,24 @@ final class DriverController extends Controller
      */
     private function availableRoutes(): Collection
     {
-        if (! $this->canSelectRoute()) {
-            $userRoute = auth()->user()?->route;
-
-            return $userRoute instanceof Route
-                ? collect([$userRoute])
-                : collect();
-        }
-
-        return Route::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
-    }
-
-    private function canSelectRoute(): bool
-    {
         $user = auth()->user();
 
-        return (bool) ($user?->hasRole('super_admin') || $user?->can('machines.view'));
+        if (! $user instanceof User) {
+            return collect();
+        }
+
+        if ($this->canManageAnyRoute($user)) {
+            return Route::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        }
+
+        return $this->routeScheduleService->availableRoutesForUser($user, today());
+    }
+
+    private function canManageAnyRoute(User $user): bool
+    {
+        return $this->routeScheduleService->canManageAnyRoute($user);
     }
 }
