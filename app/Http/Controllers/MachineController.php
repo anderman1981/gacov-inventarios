@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -125,8 +126,8 @@ final class MachineController extends Controller
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 

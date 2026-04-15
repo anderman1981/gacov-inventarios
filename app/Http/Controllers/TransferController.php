@@ -14,6 +14,7 @@ use App\Models\TransferOrderItem;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -31,7 +32,7 @@ final class TransferController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->where('code', 'like', "%{$search}%");
+            $query->where('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
         }
 
         $transfers = $query->paginate(15)->withQueryString();

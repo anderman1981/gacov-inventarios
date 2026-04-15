@@ -12,6 +12,7 @@ use App\Models\StockMovement;
 use App\Models\TransferOrder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -39,7 +40,7 @@ final class TransferApiController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->where('code', 'like', "%{$search}%");
+            $query->where('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
         }
 
         $perPage = min($request->integer('per_page', 15), 50);

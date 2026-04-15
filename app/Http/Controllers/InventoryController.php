@@ -24,6 +24,7 @@ use App\Notifications\InventoryAdjustmentNotification;
 use App\Support\Inventory\InventoryAdjustmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
@@ -58,8 +59,8 @@ final class InventoryController extends Controller
                 ->where('stock.warehouse_id', $mainWarehouse->id)
                 ->when($search !== '', function ($query) use ($search): void {
                     $query->where(function ($nestedQuery) use ($search): void {
-                        $nestedQuery->where('products.name', 'like', "%{$search}%")
-                            ->orWhere('products.code', 'like', "%{$search}%");
+                        $nestedQuery->where('products.name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                            ->orWhere('products.code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
                     });
                 })
                 ->when($category !== '', fn ($query) => $query->where('products.category', $category));
@@ -200,7 +201,7 @@ final class InventoryController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->whereHas('product', fn ($q) => $q->where('name', 'like', "%{$search}%"));
+            $query->whereHas('product', fn ($q) => $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%"));
         }
 
         if ($from = $request->input('from')) {
@@ -242,8 +243,8 @@ final class InventoryController extends Controller
 
         if ($search !== '') {
             $routeQuery->where(function ($query) use ($search): void {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                $query->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 
@@ -309,8 +310,8 @@ final class InventoryController extends Controller
 
         if ($search = trim((string) $request->input('search'))) {
             $machineQuery->where(function ($query) use ($search): void {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                $query->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 

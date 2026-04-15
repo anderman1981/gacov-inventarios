@@ -11,6 +11,7 @@ use App\Models\Invoice;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -56,9 +57,9 @@ final class InvoiceController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search): void {
-                $q->where('full_number', 'like', "%{$search}%")
-                    ->orWhere('client_name', 'like', "%{$search}%")
-                    ->orWhere('client_nit', 'like', "%{$search}%");
+                $q->where('full_number', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('client_name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('client_nit', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 
