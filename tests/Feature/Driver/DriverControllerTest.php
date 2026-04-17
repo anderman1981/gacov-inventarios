@@ -7,6 +7,7 @@ namespace Tests\Feature\Driver;
 use App\Domain\Tenant\Services\TenantContext;
 use App\Models\AppModule;
 use App\Models\Machine;
+use App\Models\MachineStockingItem;
 use App\Models\MachineStockingRecord;
 use App\Models\MachineSaleItem;
 use App\Models\Product;
@@ -18,6 +19,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
@@ -191,6 +193,12 @@ final class DriverControllerTest extends TestCase
 
     public function test_driver_can_access_stocking_form(): void
     {
+        $product = Product::factory()->create([
+            'code' => 'NOV-001',
+            'name' => 'Producto de prueba',
+        ]);
+        Stock::factory()->forWarehouse($this->vehicleWarehouse)->forProduct($product)->withQuantity(5)->create();
+
         $response = $this->actingAs($this->driver)->get(route('driver.stocking.create'));
 
         $response->assertStatus(200);
@@ -199,6 +207,7 @@ final class DriverControllerTest extends TestCase
         $response->assertSee('Fase 1 — Inspección de máquina.');
         $response->assertSee('Ubicación de la máquina');
         $response->assertSee('Productos a surtir');
+        $response->assertSee('Registrar novedad');
     }
 
     public function test_stocking_form_groups_machine_selection_by_location(): void
@@ -226,6 +235,52 @@ final class DriverControllerTest extends TestCase
         $response->assertViewHas('vehicleWarehouse');
     }
 
+    public function test_stocking_form_paginates_and_filters_products(): void
+    {
+        foreach (range(1, 12) as $index) {
+            $product = Product::factory()->create([
+                'code' => 'PG-' . str_pad((string) $index, 2, '0', STR_PAD_LEFT),
+                'name' => 'Producto paginado ' . $index,
+            ]);
+
+            Stock::factory()->forWarehouse($this->vehicleWarehouse)->forProduct($product)->withQuantity(6)->create();
+        }
+
+        foreach (range(13, 16) as $index) {
+            Product::factory()->create([
+                'code' => 'PG-' . str_pad((string) $index, 2, '0', STR_PAD_LEFT),
+                'name' => 'Producto sin stock ' . $index,
+            ]);
+        }
+
+        $response = $this->actingAs($this->driver)->get(route('driver.stocking.create', [
+            'stock_filter' => 'with_stock',
+            'per_page' => 10,
+        ]));
+
+        $products = $response->viewData('products');
+
+        $this->assertInstanceOf(LengthAwarePaginator::class, $products);
+        $this->assertSame(12, $products->total());
+        $this->assertCount(10, $products->items());
+        $response->assertSee('Mostrando 1-10 de 12 productos');
+    }
+
+    public function test_stocking_filters_preserve_selected_machine_context(): void
+    {
+        $response = $this->actingAs($this->driver)->get(route('driver.stocking.create', [
+            'route_id' => $this->route->id,
+            'machine_id' => $this->machine->id,
+            'stocking_location_group' => $this->machine->location,
+            'stock_filter' => 'low_stock',
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee($this->machine->name);
+        $response->assertSee($this->machine->location);
+        $response->assertSee((string) $this->machine->id);
+    }
+
     // ──────────────────────────────────────────────────────────────
     // STORE STOCKING — HAPPY PATH
     // ──────────────────────────────────────────────────────────────
@@ -240,13 +295,18 @@ final class DriverControllerTest extends TestCase
         $response = $this->actingAs($this->driver)->post(route('driver.stocking.store'), [
             'route_id' => $this->route->id,
             'machine_id' => $this->machine->id,
-            'items' => [$product->id => ['quantity' => 3]],
+            'items' => [$product->id => [
+                'quantity' => 3,
+                'notes' => 'Producto con empaque golpeado.',
+            ]],
         ]);
 
         $record = MachineStockingRecord::query()->latest('id')->firstOrFail();
+        $item = MachineStockingItem::query()->where('stocking_record_id', $record->id)->firstOrFail();
 
         $response->assertRedirect(route('driver.stocking.loading', $record));
         $response->assertSessionHas('success');
+        $this->assertSame('Producto con empaque golpeado.', $item->notes);
     }
 
     public function test_driver_can_open_stocking_loading_view(): void
@@ -403,6 +463,25 @@ final class DriverControllerTest extends TestCase
         $response->assertSee('Con stock');
         $response->assertSee('Producto con stock');
         $response->assertDontSee('Producto sin stock');
+    }
+
+    public function test_sales_form_paginates_products(): void
+    {
+        Product::factory()->count(11)->create();
+
+        $response = $this->actingAs($this->driver)->get(route('driver.sales.create', [
+            'route_id' => $this->route->id,
+            'machine_id' => $this->machine->id,
+            'per_page' => 10,
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Por página');
+        $products = $response->viewData('products');
+        $this->assertInstanceOf(LengthAwarePaginator::class, $products);
+        $this->assertSame(10, $products->perPage());
+        $this->assertSame(10, $products->count());
+        $this->assertTrue($products->hasPages());
     }
 
     // ──────────────────────────────────────────────────────────────

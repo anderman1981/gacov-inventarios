@@ -24,30 +24,41 @@ Mejorar la experiencia de uso y la lógica operativa de inventarios, ventas, má
 
 ### 2. Registrar venta en máquina
 
-- [ ] Rediseñar el bloque principal de registro de venta para que quepa completo en responsive sin scroll horizontal.
-- [ ] Agregar un filtro visible de stock disponible para separar productos con stock, stock bajo y sin stock.
-- [ ] Ajustar la tabla para que el contenido se adapte al ancho de pantalla.
-- [ ] Mantener editable el precio unitario por línea.
-- [ ] Confirmar que la observación por producto siga visible y cómoda de editar.
-- [ ] Revisar el comportamiento en pantallas pequeñas y evitar columnas innecesarias.
+- [x] Rediseñar el bloque principal de registro de venta para que quepa completo en responsive sin scroll horizontal.
+- [x] Agregar un filtro visible de stock disponible para separar productos con stock, stock bajo y sin stock.
+- [x] Ajustar la tabla para que el contenido se adapte al ancho de pantalla.
+- [x] Mantener editable el precio unitario por línea.
+- [x] Confirmar que la observación por producto siga visible y cómoda de editar.
+- [x] Revisar el comportamiento en pantallas pequeñas y evitar columnas innecesarias.
+- [x] Validar paginación amigable con opciones `10`, `20`, `50`, `100` para recorrer el catálogo sin cargar demasiadas filas.
+- [x] Registrar el hallazgo de CI/CD: `php artisan migrate --force` falló en GitHub Actions por acceso denegado a MySQL con `gacov_user`; dejar el fix documentado para revisar variables, credenciales y disponibilidad del servicio antes del deploy.
+
+**Resultado:** la vista de venta quedó en formato tabla, con paginación y filtro de stock, y el incidente de CI/CD quedó anotado para validar el pipeline de GitHub antes de promover cambios de base de datos.
 
 ### 3. Vista interna de máquinas
 
-- [ ] Corregir colores de texto con baja legibilidad.
-- [ ] Agregar paginación configurable con opciones `10`, `20`, `50`, `100`.
-- [ ] Incorporar filtros en el stock actual.
-- [ ] Alinear la altura visual del bloque de stock con la información general.
-- [ ] Habilitar scroll interno solo donde sea necesario, sin romper la vista completa.
-- [ ] Validar que la tabla conserve una lectura limpia en responsive.
+- [x] Corregir colores de texto con baja legibilidad.
+- [x] Agregar paginación configurable con opciones `10`, `20`, `50`, `100`.
+- [x] Incorporar filtros en el stock actual.
+- [x] Alinear la altura visual del bloque de stock con la información general.
+- [x] Habilitar scroll interno solo donde sea necesario, sin romper la vista completa.
+- [x] Validar que la tabla conserve una lectura limpia en responsive.
+- [x] Revisar si el panel de stock actual puede compartir el mismo patrón visual de paginación usado en ventas.
+
+**Resultado:** la vista interna de máquina quedó con filtros automáticos, paginación y panel de stock balanceado frente a la información general.
 
 ### 4. Surtir máquina
 
-- [ ] Reorganizar la vista para mejorar distribución y evitar espacios desperdiciados.
-- [ ] Agregar filtros en la tabla de productos.
-- [ ] Mostrar más columnas para `admin`, `manager`, `contador` y `super_admin` sin edición: costo, precio de venta y stock.
-- [ ] Para `conductor`, reemplazar esa información sensible por una acción clara para registrar novedad.
-- [ ] Registrar ubicación automáticamente cuando el conductor ingrese información.
-- [ ] Validar que el flujo siga siendo usable en móvil y sin scroll horizontal excesivo.
+- [x] Reorganizar la vista para mejorar distribución y evitar espacios desperdiciados.
+- [x] Agregar filtros en la tabla de productos.
+- [x] Mostrar más columnas para `admin`, `manager`, `contador` y `super_admin` sin edición: costo, precio de venta y stock.
+- [x] Para `conductor`, reemplazar esa información sensible por una acción clara para registrar novedad.
+- [x] Registrar ubicación automáticamente cuando el conductor ingrese información.
+- [x] Validar que el flujo siga siendo usable en móvil y sin scroll horizontal excesivo.
+- [x] Agregar paginación real para evitar una tabla interminable.
+- [x] Encapsular la tabla en un scroll interno con encabezado fijo.
+
+**Resultado:** `Surtir máquina` ahora usa una distribución más amplia, filtros de búsqueda/estado por producto, paginación real, scroll interno controlado, columnas comerciales para roles con lectura extendida y una acción de novedad persistida por ítem para conductor, con geolocalización automática al guardar.
 
 ### 5. Traslados
 

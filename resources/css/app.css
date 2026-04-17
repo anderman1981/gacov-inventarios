@@ -2618,10 +2618,84 @@ body.dashboard-compact-mode .dashboard-table-compact td {
   gap: var(--space-3);
 }
 
+.driver-dashboard .form-label {
+  color: #334155;
+  font-weight: 600;
+}
+
+.driver-dashboard .form-input {
+  background: #ffffff;
+  border-color: var(--driver-border-soft);
+  color: var(--driver-text);
+}
+
+.driver-dashboard .form-input:focus {
+  border-color: var(--gacov-primary);
+  box-shadow: 0 0 0 3px rgba(215, 25, 32, 0.10);
+}
+
 .driver-header-actions {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+.driver-dashboard {
+  --driver-surface: #ffffff;
+  --driver-surface-soft: #f8fbff;
+  --driver-border-soft: #dbe6f1;
+  --driver-text: #0f172a;
+  --driver-muted: #64748b;
+}
+
+.driver-dashboard .page-title {
+  color: var(--driver-text);
+  letter-spacing: -0.02em;
+}
+
+.driver-dashboard .page-subtitle {
+  color: var(--driver-muted);
+}
+
+.driver-action-primary,
+.driver-action-secondary {
+  min-width: 180px;
+  justify-content: center;
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.driver-action-primary {
+  background: linear-gradient(135deg, var(--gacov-primary) 0%, var(--gacov-primary-light) 100%);
+}
+
+.driver-action-secondary {
+  background: #fff;
+  color: var(--driver-text);
+  border: 1px solid var(--driver-border-soft);
+}
+
+.driver-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.18);
+}
+
+.driver-action-secondary .driver-action-icon {
+  background: rgba(215, 25, 32, 0.10);
+  color: var(--gacov-primary);
+}
+
+.driver-route-panel,
+.driver-map-panel,
+.driver-machines-panel {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
+  border-color: var(--driver-border-soft);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
 }
 
 .driver-quick-grid {
@@ -2632,26 +2706,103 @@ body.dashboard-compact-mode .dashboard-table-compact td {
 }
 
 .driver-quick-card {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
   padding: var(--space-5);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(0, 212, 255, 0.12);
-  background: linear-gradient(180deg, rgba(17,24,39,0.92) 0%, rgba(10,14,26,0.95) 100%);
-  color: var(--gacov-text-primary);
+  border: 1px solid var(--driver-border-soft);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: var(--driver-text);
   text-decoration: none;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.driver-quick-card::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gacov-primary), var(--gacov-secondary));
+  opacity: .9;
+}
+
+.driver-quick-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(215, 25, 32, 0.10);
+  color: var(--gacov-primary);
+  flex-shrink: 0;
+}
+
+.driver-quick-card__icon--sales {
+  background: rgba(124, 58, 237, 0.10);
+  color: #7c3aed;
+}
+
+.driver-quick-card__icon--inventory {
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
 }
 
 .driver-quick-title {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   margin-bottom: 6px;
+  color: var(--driver-text);
 }
 
 .driver-quick-copy {
   font-size: 13px;
-  color: var(--gacov-text-secondary);
+  color: var(--driver-muted);
+  line-height: 1.45;
+}
+
+.driver-kpi-grid .kpi-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-color: var(--driver-border-soft);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.driver-kpi-grid .kpi-value,
+.driver-kpi-grid .kpi-label {
+  color: var(--driver-text);
+}
+
+.driver-map-panel .panel-header,
+.driver-machines-panel .panel-header {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.driver-dashboard .data-table th {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.driver-dashboard .data-table td {
+  color: #111827;
+}
+
+.driver-dashboard .badge-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.driver-dashboard .badge-warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.driver-dashboard .badge-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
 }
 
 .driver-photo-import {
@@ -3015,6 +3166,10 @@ body.dashboard-compact-mode .dashboard-table-compact td {
   }
 
   .driver-header-actions {
+    width: 100%;
+  }
+
+  .driver-dashboard .driver-header-actions {
     width: 100%;
   }
 

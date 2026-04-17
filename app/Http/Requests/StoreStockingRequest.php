@@ -20,6 +20,7 @@ final class StoreStockingRequest extends FormRequest
             'machine_id' => ['required', 'integer', 'exists:machines,id'],
             'items' => ['required', 'array'],
             'items.*.quantity' => ['nullable', 'integer', 'min:0'],
+            'items.*.notes' => ['nullable', 'string', 'max:200'],
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }

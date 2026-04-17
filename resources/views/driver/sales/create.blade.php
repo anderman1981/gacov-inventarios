@@ -3,6 +3,7 @@
 
 @php
     $routeQuery = $route?->id ? ['route_id' => $route->id] : [];
+    $salesTableHasPages = $products->hasPages();
 @endphp
 
 @section('content')
@@ -65,6 +66,17 @@
                 </select>
             </div>
 
+            <div class="form-group" style="margin-bottom:0">
+                <label class="form-label" for="driver-sales-per-page">Por página</label>
+                <select id="driver-sales-per-page" name="per_page" class="form-input" onchange="this.form.submit()" {{ $selectedMachine ? '' : 'disabled' }}>
+                    @foreach($perPageOptions as $option)
+                        <option value="{{ $option }}" {{ (int) $perPage === (int) $option ? 'selected' : '' }}>
+                            {{ $option }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
             <noscript>
                 <button type="submit" class="btn btn-primary" style="width:auto">Cargar selección</button>
             </noscript>
@@ -96,7 +108,7 @@
     </div>
 </div>
 
-<div class="panel" style="max-width:1100px">
+<div class="panel sales-table-panel" style="max-width:none">
     <div class="panel-header">
         <span class="panel-title">Registro de venta en máquina</span>
         <span class="badge badge-neutral">Precio editable, stock en contexto y notas por línea</span>
@@ -106,6 +118,13 @@
             @csrf
             <input type="hidden" name="route_id" value="{{ $route?->id }}">
             <input type="hidden" name="machine_id" value="{{ $selectedMachine?->id }}">
+
+            @if($salesTableHasPages)
+            <div class="inventory-results-bar" style="margin:0 0 var(--space-4)">
+                <span>Mostrando <strong>{{ number_format($products->firstItem() ?? 0, 0, ',', '.') }}-{{ number_format($products->lastItem() ?? 0, 0, ',', '.') }}</strong> de <strong>{{ number_format($products->total(), 0, ',', '.') }}</strong> productos</span>
+                <span>Página <strong>{{ number_format($products->currentPage(), 0, ',', '.') }}</strong> de <strong>{{ number_format($products->lastPage(), 0, ',', '.') }}</strong></span>
+            </div>
+            @endif
 
             <div class="table-scroll sales-table-scroll">
                 <table class="data-table sales-line-items-table">
@@ -188,6 +207,15 @@
                     </tbody>
                 </table>
             </div>
+
+            @if($salesTableHasPages)
+            <div class="inventory-pagination sales-pagination">
+                <div class="inventory-pagination__meta">
+                    Mostrando {{ number_format($products->firstItem() ?? 0, 0, ',', '.') }}-{{ number_format($products->lastItem() ?? 0, 0, ',', '.') }} de {{ number_format($products->total(), 0, ',', '.') }} productos
+                </div>
+                <div>{{ $products->links() }}</div>
+            </div>
+            @endif
 
             <div class="sales-total-strip">
                 <div>
@@ -295,10 +323,20 @@
         color: var(--gacov-text-primary);
     }
 
+    .sales-table-panel {
+        width: 100%;
+        max-width: none;
+    }
+
+    .sales-table-scroll {
+        overflow-x: hidden;
+    }
+
     .sales-line-items-table {
-        min-width: 1180px;
-        border-collapse: separate;
-        border-spacing: 0 10px;
+        width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+        border-collapse: collapse;
     }
 
     .sales-line-items-table thead th {
@@ -308,7 +346,15 @@
         font-size: 11px;
         letter-spacing: .08em;
         text-transform: uppercase;
-        padding-bottom: 10px;
+        padding: 0 10px 10px;
+        white-space: nowrap;
+    }
+
+    .sales-line-items-table thead th::before,
+    .sales-line-items-table thead th::after,
+    .sales-line-items-table thead th svg {
+        display: none !important;
+        content: none !important;
     }
 
     .sales-line-items-table tbody tr {
@@ -317,7 +363,7 @@
     }
 
     .sales-line-items-table tbody td {
-        padding: 14px 12px;
+        padding: 12px 10px;
         vertical-align: middle;
         border-top: 1px solid rgba(148, 163, 184, 0.16);
         border-bottom: 1px solid rgba(148, 163, 184, 0.16);
@@ -339,10 +385,11 @@
     .sale-code-cell {
         white-space: nowrap;
         font-weight: 900;
+        width: 6%;
     }
 
     .sale-product-cell {
-        min-width: 220px;
+        width: 22%;
     }
 
     .sale-product-name {
@@ -350,6 +397,7 @@
         font-size: 14px;
         font-weight: 900;
         line-height: 1.15;
+        word-break: break-word;
     }
 
     .sale-product-unit {
@@ -364,23 +412,67 @@
         color: #dc2626;
         font-weight: 800;
         white-space: nowrap;
+        width: 7%;
     }
 
     .sale-stock-cell {
         text-align: right;
+        width: 8%;
     }
 
     .sale-price-cell,
     .sale-notes-cell,
     .sale-qty-cell {
-        min-width: 120px;
+        min-width: 0;
     }
+
+    .sale-price-cell { width: 12%; }
+    .sale-notes-cell { width: 17%; }
+    .sale-qty-cell { width: 6%; }
 
     .sale-subtotal-cell {
         text-align: right;
         font-weight: 900;
         color: var(--gacov-primary);
         white-space: nowrap;
+        width: 6%;
+    }
+
+    .sales-line-items-table th:nth-child(1),
+    .sales-line-items-table td:nth-child(1) { width: 6%; }
+    .sales-line-items-table th:nth-child(2),
+    .sales-line-items-table td:nth-child(2) { width: 22%; }
+    .sales-line-items-table th:nth-child(3),
+    .sales-line-items-table td:nth-child(3) { width: 5%; }
+    .sales-line-items-table th:nth-child(4),
+    .sales-line-items-table td:nth-child(4) { width: 10%; }
+    .sales-line-items-table th:nth-child(5),
+    .sales-line-items-table td:nth-child(5) { width: 7%; }
+    .sales-line-items-table th:nth-child(6),
+    .sales-line-items-table td:nth-child(6) { width: 8%; }
+    .sales-line-items-table th:nth-child(7),
+    .sales-line-items-table td:nth-child(7) { width: 12%; }
+    .sales-line-items-table th:nth-child(8),
+    .sales-line-items-table td:nth-child(8) { width: 17%; }
+    .sales-line-items-table th:nth-child(9),
+    .sales-line-items-table td:nth-child(9) { width: 5%; }
+    .sales-line-items-table th:nth-child(10),
+    .sales-line-items-table td:nth-child(10) { width: 8%; }
+
+    .sales-line-items-table td:nth-child(2),
+    .sales-line-items-table td:nth-child(8) {
+        word-break: break-word;
+        white-space: normal;
+    }
+
+    .sale-line-input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .sale-line-price,
+    .sale-line-qty {
+        text-align: right;
     }
 
     .sales-total-strip {
@@ -418,7 +510,13 @@
 
     @media (max-width: 960px) {
         .sales-line-items-table {
-            min-width: 1120px;
+            font-size: 12px;
+        }
+
+        .sales-line-items-table thead th,
+        .sales-line-items-table tbody td {
+            padding-left: 8px;
+            padding-right: 8px;
         }
     }
 </style>

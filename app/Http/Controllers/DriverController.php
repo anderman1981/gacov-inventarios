@@ -88,6 +88,10 @@ final class DriverController extends Controller
 
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
+        $productSearch = mb_strtolower(trim((string) $request->string('product_search', '')));
+        $stockFilter = $request->string('stock_filter', 'all')->toString();
+        $perPage = max(10, min(100, $request->integer('per_page', 10)));
+        $perPageOptions = [10, 20, 50, 100];
 
         $machines = Machine::where('route_id', $route?->id)
             ->where('is_active', true)
@@ -111,7 +115,47 @@ final class DriverController extends Controller
                 return $product;
             });
 
-        return view('driver.stocking.create', compact('machines', 'products', 'vehicleWarehouse', 'route', 'availableRoutes'));
+        $products = $products->filter(function (Product $product) use ($productSearch, $stockFilter): bool {
+            $productName = mb_strtolower(trim((string) $product->name));
+            $productCode = mb_strtolower(trim((string) $product->code));
+            $productCategory = mb_strtolower(trim((string) ($product->category ?? '')));
+
+            $matchesSearch = $productSearch === ''
+                || str_contains($productName, $productSearch)
+                || str_contains($productCode, $productSearch)
+                || str_contains($productCategory, $productSearch);
+
+            $matchesStock = match ($stockFilter) {
+                'with_stock' => $product->vehicle_stock > 0,
+                'low_stock' => $product->vehicle_stock > 0 && $product->vehicle_stock <= 5,
+                'empty' => $product->vehicle_stock <= 0,
+                default => true,
+            };
+
+            return $matchesSearch && $matchesStock;
+        })->values();
+
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $products = new LengthAwarePaginator(
+            $products->forPage($currentPage, $perPage)->values(),
+            $products->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url()]
+        );
+        $products->appends($request->except('page'));
+
+        return view('driver.stocking.create', compact(
+            'machines',
+            'products',
+            'vehicleWarehouse',
+            'route',
+            'availableRoutes',
+            'productSearch',
+            'stockFilter',
+            'perPage',
+            'perPageOptions',
+        ));
     }
 
     public function storeStocking(StoreStockingRequest $request): RedirectResponse
@@ -270,7 +314,8 @@ final class DriverController extends Controller
         $availableRoutes = $this->availableRoutes();
         $selectedMachineId = $request->integer('machine_id');
         $stockFilter = $request->string('stock_filter', 'all')->toString();
-        $perPage = max(5, min(100, $request->integer('per_page', 10)));
+        $perPage = max(10, min(100, $request->integer('per_page', 10)));
+        $perPageOptions = [10, 20, 50, 100];
 
         $machines = collect();
         $selectedMachine = null;
@@ -347,6 +392,7 @@ final class DriverController extends Controller
             'selectedMachineAvailableSkus',
             'stockFilter',
             'perPage',
+            'perPageOptions',
         ));
     }
 

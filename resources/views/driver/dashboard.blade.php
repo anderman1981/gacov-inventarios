@@ -37,6 +37,7 @@
 
 @section('content')
 @php($routeQuery = $route?->id ? ['route_id' => $route->id] : [])
+<div class="driver-dashboard">
 <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">
     <div>
         <h1 class="page-title">Hola, {{ auth()->user()->name }}</h1>
@@ -51,14 +52,14 @@
     </div>
     <div class="driver-header-actions">
         @moduleEnabled('drivers')
-        <a href="{{ route('driver.stocking.create', $routeQuery) }}" class="btn btn-primary" style="width:auto">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
+        <a href="{{ route('driver.stocking.create', $routeQuery) }}" class="btn btn-primary driver-action-primary" style="width:auto">
+            <span class="driver-action-icon"><svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg></span>
             Surtir máquina
         </a>
         @endmoduleEnabled
         @moduleEnabled('sales')
-        <a href="{{ route('driver.sales.create', $routeQuery) }}" class="btn" style="background:var(--gacov-bg-elevated);color:var(--gacov-text-primary);width:auto">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+        <a href="{{ route('driver.sales.create', $routeQuery) }}" class="btn driver-action-secondary" style="width:auto">
+            <span class="driver-action-icon"><svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg></span>
             Registrar venta
         </a>
         @endmoduleEnabled
@@ -66,7 +67,7 @@
 </div>
 
 @if($availableRoutes->isNotEmpty())
-<div class="panel" style="margin-bottom:var(--space-5)">
+<div class="panel driver-route-panel" style="margin-bottom:var(--space-5)">
     <div class="panel-body">
         <form method="GET" action="{{ route('driver.dashboard') }}" class="driver-route-switcher">
             <div class="form-group" style="margin-bottom:0">
@@ -89,28 +90,43 @@
 <div class="driver-quick-grid">
     @moduleEnabled('drivers')
     <a href="{{ route('driver.stocking.create', $routeQuery) }}" class="driver-quick-card">
-        <div class="driver-quick-title">Surtido</div>
-        <div class="driver-quick-copy">Cargar planilla o surtir una máquina de la ruta.</div>
+        <div class="driver-quick-card__icon">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
+        </div>
+        <div>
+            <div class="driver-quick-title">Surtido</div>
+            <div class="driver-quick-copy">Cargar planilla o surtir una máquina de la ruta.</div>
+        </div>
     </a>
     @endmoduleEnabled
     @moduleEnabled('sales')
     <a href="{{ route('driver.sales.create', $routeQuery) }}" class="driver-quick-card">
-        <div class="driver-quick-title">Ventas</div>
-        <div class="driver-quick-copy">Registrar ventas desde la máquina seleccionada.</div>
+        <div class="driver-quick-card__icon driver-quick-card__icon--sales">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+        </div>
+        <div>
+            <div class="driver-quick-title">Ventas</div>
+            <div class="driver-quick-copy">Registrar ventas desde la máquina seleccionada.</div>
+        </div>
     </a>
     @endmoduleEnabled
     @can('vehicle.inventory.view')
     @moduleEnabled('inventory')
     <a href="{{ route('driver.inventory', $routeQuery) }}" class="driver-quick-card">
-        <div class="driver-quick-title">Vehículo</div>
-        <div class="driver-quick-copy">Consultar inventario disponible en el vehículo.</div>
+        <div class="driver-quick-card__icon driver-quick-card__icon--inventory">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+        </div>
+        <div>
+            <div class="driver-quick-title">Vehículo</div>
+            <div class="driver-quick-copy">Consultar inventario disponible en el vehículo.</div>
+        </div>
     </a>
     @endmoduleEnabled
     @endcan
 </div>
 
 {{-- KPIs del día --}}
-<div class="kpi-grid" style="margin-bottom:var(--space-8)">
+<div class="kpi-grid driver-kpi-grid" style="margin-bottom:var(--space-8)">
     <div class="kpi-card" style="--kpi-accent:#D71920;--kpi-bg:rgba(215,25,32,.08)">
         <div class="kpi-icon">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
@@ -143,7 +159,7 @@
 
 {{-- Mapa de máquinas --}}
 @if($machines->isNotEmpty() && $machines->contains(fn($m) => $m->latitude && $m->longitude))
-<div class="panel" style="margin-bottom:var(--space-8)">
+<div class="panel driver-map-panel" style="margin-bottom:var(--space-8)">
     <div class="panel-header">
         <span class="panel-title">Ubicación de máquinas</span>
         <span class="badge badge-info">{{ $machines->filter(fn($m) => $m->latitude && $m->longitude)->count() }} máquinas con GPS</span>
@@ -155,7 +171,7 @@
 @endif
 
 {{-- Lista de máquinas --}}
-<div class="panel">
+<div class="panel driver-machines-panel">
     <div class="panel-header">
         <span class="panel-title">Máquinas de mi ruta</span>
         @can('vehicle.inventory.view')
@@ -232,6 +248,7 @@
         <p>No hay máquinas asignadas a tu ruta.</p>
     </div>
     @endif
+    </div>
 </div>
 @endsection
 
