@@ -23,7 +23,7 @@ final class EnsureTenantContext
         }
 
         // Super admin: sin contexto de tenant, ve todos los datos
-        if ($user->is_super_admin) {
+        if ($user->isSuperAdmin()) {
             $this->tenantContext->setTenant(null);
 
             return $next($request);

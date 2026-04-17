@@ -1,18 +1,20 @@
 @extends('layouts.app')
 
-@section('title', 'Facturas')
+@section('title', 'Facturación')
 
 @section('content')
 <div class="page-header">
     <div class="page-header-left">
-        <h1>Facturas</h1>
-        <p class="page-subtitle">Gestión de facturas formales con soporte DIAN</p>
+        <h1>Facturación</h1>
+        <p class="page-subtitle">Historial de cobros, comprobantes y pagos del sistema. Vista de consulta para clientes.</p>
     </div>
     <div class="page-header-actions">
+        @if(auth()->user()?->isSuperAdmin())
         <a href="{{ route('invoices.create') }}" class="btn btn-primary">
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
-            Nueva Factura
+            Nueva factura interna
         </a>
+        @endif
     </div>
 </div>
 
@@ -24,7 +26,7 @@
         </div>
         <div class="stat-content">
             <span class="stat-value">{{ number_format($stats['total']) }}</span>
-            <span class="stat-label">Total Facturas</span>
+            <span class="stat-label">Documentos</span>
         </div>
     </div>
 
@@ -151,12 +153,12 @@
                         <a href="{{ route('invoices.show', $invoice) }}" class="btn-icon" title="Ver">
                             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"/></svg>
                         </a>
-                        @if($invoice->status === 'draft')
+                        @if(auth()->user()?->isSuperAdmin() && $invoice->status === 'draft')
                         <a href="{{ route('invoices.edit', $invoice) }}" class="btn-icon" title="Editar">
                             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
                         </a>
                         @endif
-                        @if($invoice->status === 'issued')
+                        @if(auth()->user()?->isSuperAdmin() && $invoice->status === 'issued')
                         <form action="{{ route('invoices.issue', $invoice) }}" method="POST" class="inline">
                             @csrf
                             <button type="submit" class="btn-icon" title="Descargar PDF">
@@ -173,8 +175,10 @@
                     <div class="empty-icon">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/></svg>
                     </div>
-                    <p>No hay facturas registradas</p>
-                    <a href="{{ route('invoices.create') }}" class="btn btn-primary">Crear primera factura</a>
+                    <p>No hay documentos de facturación registrados</p>
+                    @if(auth()->user()?->isSuperAdmin())
+                    <a href="{{ route('invoices.create') }}" class="btn btn-primary">Crear primera factura interna</a>
+                    @endif
                 </td>
             </tr>
             @endforelse
@@ -192,6 +196,141 @@
 
 @push('styles')
 <style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.page-header-left h1 {
+    font-size: 28px;
+    line-height: 1.15;
+    margin: 0 0 6px;
+}
+
+.page-subtitle {
+    color: var(--amr-text-secondary, #6B7280);
+    max-width: 760px;
+}
+
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 92px;
+    padding: 16px 18px;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.stat-icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+.stat-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.stat-icon-total { background: rgba(239, 68, 68, 0.10); color: #ef4444; }
+.stat-icon-draft { background: rgba(148, 163, 184, 0.12); color: #64748b; }
+.stat-icon-issued { background: rgba(14, 165, 233, 0.10); color: #0ea5e9; }
+.stat-icon-paid { background: rgba(16, 185, 129, 0.10); color: #10b981; }
+
+.stat-content { display: flex; flex-direction: column; min-width: 0; }
+.stat-value { font-size: 28px; font-weight: 800; line-height: 1; color: #0f172a; }
+.stat-label { font-size: 13px; color: var(--amr-text-secondary, #64748b); margin-top: 4px; }
+
+.filter-bar,
+.table-container {
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.filter-bar { padding: 14px; margin-bottom: 18px; }
+.filter-form { width: 100%; }
+.filter-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-input,
+.filter-select {
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+    background: #fff;
+    color: #0f172a;
+    min-width: 170px;
+}
+
+.filter-input:focus,
+.filter-select:focus {
+    outline: none;
+    border-color: rgba(239, 68, 68, 0.55);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.filter-input { flex: 1 1 280px; }
+.filter-date { min-width: 150px; }
+
+.btn-secondary,
+.btn-ghost {
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 12px;
+}
+
+.table-container { overflow: hidden; }
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.data-table td {
+    color: #0f172a;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
 .invoice-link { color: var(--amr-primary, #00D4FF); text-decoration: none; }
 .invoice-link:hover { text-decoration: underline; }
 
@@ -226,10 +365,10 @@
 .btn-icon {
     display: flex; align-items: center; justify-content: center;
     width: 32px; height: 32px; border-radius: 6px;
-    background: transparent; border: 1px solid rgba(255,255,255,0.1);
-    color: #9CA3AF; cursor: pointer; transition: all 0.2s;
+    background: transparent; border: 1px solid rgba(15,23,42,0.10);
+    color: #64748b; cursor: pointer; transition: all 0.2s;
 }
-.btn-icon:hover { background: rgba(255,255,255,0.05); color: #F9FAFB; border-color: rgba(255,255,255,0.2); }
+.btn-icon:hover { background: rgba(239,68,68,0.08); color: #ef4444; border-color: rgba(239,68,68,0.18); }
 .btn-icon svg { width: 16px; height: 16px; }
 
 .inline { display: inline; }
@@ -237,6 +376,20 @@
 .empty-state { text-align: center; padding: 48px 24px !important; }
 .empty-icon { width: 64px; height: 64px; margin: 0 auto 16px; opacity: 0.3; }
 .empty-icon svg { width: 100%; height: 100%; }
-.empty-state p { color: var(--amr-text-muted, #9CA3AF); margin-bottom: 16px; }
+.empty-state p { color: var(--amr-text-muted, #64748b); margin-bottom: 16px; }
+
+@media (max-width: 1200px) {
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+    .page-header { flex-direction: column; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .filter-input,
+    .filter-select,
+    .btn-secondary,
+    .btn-ghost { width: 100%; }
+    .filter-row { flex-direction: column; align-items: stretch; }
+}
 </style>
 @endpush

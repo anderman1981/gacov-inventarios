@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Application\Command\Driver\CompleteStockingRecord;
+use App\Application\Command\Driver\CreateStockingInspection;
 use App\Application\Command\Driver\RegisterSale;
-use App\Application\Command\Driver\RegisterStocking;
 use App\Http\Requests\StoreSaleRequest;
 use App\Http\Requests\StoreStockingRequest;
 use App\Models\Machine;
@@ -26,7 +27,8 @@ use Illuminate\View\View;
 final class DriverController extends Controller
 {
     public function __construct(
-        private readonly RegisterStocking $registerStocking,
+        private readonly CreateStockingInspection $createStockingInspection,
+        private readonly CompleteStockingRecord $completeStockingRecord,
         private readonly RegisterSale $registerSale,
         private readonly RouteScheduleService $routeScheduleService,
     ) {}
@@ -147,12 +149,11 @@ final class DriverController extends Controller
         $geolocationAccuracy = $request->input('geolocation_accuracy');
 
         try {
-            $this->registerStocking->handle(
+            $record = $this->createStockingInspection->handle(
                 user: $user,
                 route: $route,
                 machine: $machine,
                 vehicleWarehouse: $vehicleWarehouse,
-                machineWarehouse: $machineWarehouse,
                 items: $items,
                 notes: $request->input('notes'),
                 latitude: $latitude,
@@ -163,8 +164,101 @@ final class DriverController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('driver.dashboard', ['route_id' => $route->id])
-            ->with('success', "Surtido registrado para la máquina {$machine->name}.");
+        return redirect()->route('driver.stocking.loading', $record)
+            ->with('success', "Inspección registrada. Ahora carga los productos en tu vehículo.");
+    }
+
+    /** Fase 2 — Vista de carga: el conductor ve qué debe sacar del vehículo. */
+    public function stockingLoading(int $record): View
+    {
+        $user = auth()->user();
+        abort_unless($user?->can('stockings.create'), 403);
+        $record = $this->resolveStockingRecord($record);
+        abort_unless(
+            $record->performed_by === $user->id || $user->can('stockings.manage'),
+            403
+        );
+        abort_unless($record->isPendingLoad(), 403);
+
+        $items = $record->items()->with('product')->get();
+
+        return view('driver.stocking.loading', compact('record', 'items'));
+    }
+
+    /** Fase 2 — POST: confirma que cargó el vehículo, avanza a en_surtido. */
+    public function stockingConfirmLoad(int $record): RedirectResponse
+    {
+        $user = auth()->user();
+        abort_unless($user?->can('stockings.create'), 403);
+        $record = $this->resolveStockingRecord($record);
+        abort_unless(
+            $record->performed_by === $user->id || $user->can('stockings.manage'),
+            403
+        );
+        abort_unless($record->isPendingLoad(), 403);
+
+        $record->update([
+            'status'    => MachineStockingRecord::STATUS_EN_SURTIDO,
+            'loaded_at' => now(),
+        ]);
+
+        return redirect()->route('driver.stocking.stock', $record)
+            ->with('success', 'Carga confirmada. Ya puedes ir a surtir la máquina.');
+    }
+
+    /** Fase 3 — Vista de surtido: el conductor registra efectivo y confirma que surtió. */
+    public function stockingStock(int $record): View
+    {
+        $user = auth()->user();
+        abort_unless($user?->can('stockings.create'), 403);
+        $record = $this->resolveStockingRecord($record);
+        abort_unless(
+            $record->performed_by === $user->id || $user->can('stockings.manage'),
+            403
+        );
+        abort_unless($record->isInProgress(), 403);
+
+        $items = $record->items()->with('product')->get();
+
+        return view('driver.stocking.stock', compact('record', 'items'));
+    }
+
+    /** Fase 3 — POST: completa el surtido, descuenta stock, notifica. */
+    public function stockingComplete(int $record, Request $request): RedirectResponse
+    {
+        $user = auth()->user();
+        abort_unless($user?->can('stockings.create'), 403);
+        $record = $this->resolveStockingRecord($record);
+        abort_unless(
+            $record->performed_by === $user->id || $user->can('stockings.manage'),
+            403
+        );
+        abort_unless($record->isInProgress(), 403);
+
+        $machineWarehouse = $record->machine?->warehouse;
+
+        if (! $machineWarehouse instanceof Warehouse) {
+            return back()->with('error', 'La máquina no tiene bodega asignada. Contacta al administrador.');
+        }
+
+        $cashFields = array_merge(
+            array_keys(MachineStockingRecord::BILL_DENOMINATIONS),
+            array_keys(MachineStockingRecord::COIN_DENOMINATIONS)
+        );
+
+        $cashDenominations = [];
+        foreach ($cashFields as $field) {
+            $cashDenominations[$field] = (int) $request->input($field, 0);
+        }
+
+        try {
+            $this->completeStockingRecord->handle($record, $machineWarehouse, $cashDenominations);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('driver.dashboard', ['route_id' => $record->route_id])
+            ->with('success', "¡Máquina {$record->machine?->name} surtida exitosamente!");
     }
 
     public function sales(Request $request): View
@@ -281,6 +375,13 @@ final class DriverController extends Controller
         }
 
         return $availableRoutes->first();
+    }
+
+    private function resolveStockingRecord(int $recordId): MachineStockingRecord
+    {
+        return MachineStockingRecord::query()
+            ->whereKey($recordId)
+            ->firstOrFail();
     }
 
     /**

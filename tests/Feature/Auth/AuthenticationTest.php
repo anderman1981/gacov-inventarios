@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -15,6 +16,28 @@ class AuthenticationTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertStatus(200);
+    }
+
+    public function test_login_screen_still_renders_when_vite_manifest_is_missing(): void
+    {
+        $manifestPath = public_path('build/manifest.json');
+        $backupPath = public_path('build/manifest.testing.bak');
+
+        if (File::exists($backupPath)) {
+            File::delete($backupPath);
+        }
+
+        File::move($manifestPath, $backupPath);
+
+        try {
+            $response = $this->get('/login');
+
+            $response->assertOk();
+        } finally {
+            if (File::exists($backupPath)) {
+                File::move($backupPath, $manifestPath);
+            }
+        }
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void
@@ -67,6 +90,25 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticatedAs($nextUser);
+        $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_manager_does_not_get_redirected_to_stale_driver_intended_url(): void
+    {
+        $manager = User::factory()->create([
+            'email' => 'manager-login@example.com',
+            'is_super_admin' => false,
+        ]);
+        $manager->syncRoles(['manager']);
+
+        $response = $this
+            ->withSession(['url.intended' => route('driver.dashboard', absolute: false)])
+            ->post('/login', [
+                'email' => $manager->email,
+                'password' => 'password',
+            ]);
+
+        $this->assertAuthenticatedAs($manager);
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 }

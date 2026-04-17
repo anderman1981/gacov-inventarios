@@ -12,7 +12,7 @@ final class RequireSuperAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! auth()->check() || ! auth()->user()->is_super_admin) {
+        if (! auth()->check() || ! auth()->user()->isSuperAdmin()) {
             abort(403, 'Acceso restringido al panel de administración de AMR Tech.');
         }
 

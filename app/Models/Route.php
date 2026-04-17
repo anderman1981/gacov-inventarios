@@ -15,7 +15,7 @@ final class Route extends Model
     use BelongsToTenant, HasFactory;
 
     protected $fillable = [
-        'name', 'code', 'driver_user_id', 'vehicle_plate', 'is_active',
+        'tenant_id', 'name', 'code', 'driver_user_id', 'vehicle_plate', 'is_active',
     ];
 
     protected function casts(): array

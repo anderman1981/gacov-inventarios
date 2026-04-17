@@ -51,8 +51,13 @@
 <section class="inventory-filter-card">
     <div class="inventory-filter-card__header">
         <div>
-            <div class="inventory-filter-card__title">Filtrar maquinas</div>
-            <div class="inventory-filter-card__copy">Busca por codigo, nombre o ruta para revisar rapido el stock de cada maquina.</div>
+            <div class="inventory-filter-card__title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                Filtrar máquinas
+                <button type="button" class="amr-icon-button amr-tooltip-trigger" data-tooltip="Busca por código, nombre o ruta" aria-label="Ayuda del filtro">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+            <div class="inventory-filter-card__copy">Consulta el stock de cada máquina sin abrir el detalle.</div>
         </div>
         <div class="badge badge-neutral">Maquinas visibles: {{ number_format($machines->total(), 0, ',', '.') }}</div>
     </div>
@@ -110,13 +115,13 @@
                     </span>
                     @can('inventory.adjust')
                     @if($machine->machine_warehouse)
-                    <a href="{{ route('inventory.adjust', ['warehouse_id' => $machine->machine_warehouse->id]) }}" class="badge badge-warning" style="text-decoration:none">
-                        {{ $machine->has_initial_inventory ? 'Corregir inventario' : 'Carga inicial' }}
+                    <a href="{{ route('inventory.adjust', ['warehouse_id' => $machine->machine_warehouse->id]) }}" class="amr-icon-button amr-icon-button--warning amr-tooltip-trigger" data-tooltip="{{ $machine->has_initial_inventory ? 'Corregir inventario' : 'Carga inicial' }}" aria-label="{{ $machine->has_initial_inventory ? 'Corregir inventario' : 'Carga inicial' }}">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 01.894.553l2 4A1 1 0 0112 8h-1v5.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 111.414-1.414L9 13.586V8H8a1 1 0 01-.894-1.447l2-4A1 1 0 0110 2zM4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
                     </a>
                     @endif
                     @endcan
-                    <a href="{{ route('machines.show', $machine) }}" class="badge badge-info" style="text-decoration:none">
-                        Ver detalle
+                    <a href="{{ route('machines.show', $machine) }}" class="amr-icon-button amr-icon-button--primary amr-tooltip-trigger" data-tooltip="Ver detalle" aria-label="Ver detalle">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 3c-4.418 0-8 3.582-8 7s3.582 7 8 7 8-3.582 8-7-3.582-7-8-7zm0 12a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/></svg>
                     </a>
                 </div>
             </div>

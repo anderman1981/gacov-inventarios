@@ -8,6 +8,7 @@ use App\Models\Machine;
 use App\Models\Product;
 use App\Models\Route;
 use App\Models\Stock;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Notifications\InventoryAdjustmentNotification;
@@ -16,6 +17,8 @@ use Tests\TestCase;
 
 final class InventoryWarehouseTest extends TestCase
 {
+    private Tenant $tenant;
+
     private User $adminUser;
 
     private User $viewerUser;
@@ -28,8 +31,13 @@ final class InventoryWarehouseTest extends TestCase
     {
         parent::setUp();
 
+        $this->tenant = Tenant::factory()->create();
+
         // Crear usuarios con diferentes permisos (super_admin para evitar middleware blocking)
-        $this->adminUser = User::factory()->create(['is_super_admin' => true]);
+        $this->adminUser = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'is_super_admin' => true,
+        ]);
         $this->adminUser->syncRoles(['admin']);
         $this->adminUser->givePermissionTo('inventory.view');
         $this->adminUser->givePermissionTo('inventory.adjust');
@@ -37,18 +45,26 @@ final class InventoryWarehouseTest extends TestCase
         $this->adminUser->givePermissionTo('inventory.load_excel');
         $this->adminUser->givePermissionTo('inventory.load_machine_excel');
 
-        $this->viewerUser = User::factory()->create(['is_super_admin' => true]);
+        $this->viewerUser = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'is_super_admin' => true,
+        ]);
         $this->viewerUser->givePermissionTo('inventory.view');
 
-        $this->managerUser = User::factory()->create(['is_super_admin' => true]);
+        $this->managerUser = User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'is_super_admin' => true,
+        ]);
         $this->managerUser->syncRoles(['manager']);
         $this->managerUser->givePermissionTo('inventory.view');
         $this->managerUser->givePermissionTo('inventory.adjust');
         $this->managerUser->givePermissionTo('inventory.load_vehicle_excel');
         $this->managerUser->givePermissionTo('inventory.load_machine_excel');
+        $this->managerUser->givePermissionTo('drivers.assign_routes');
 
         // Crear bodega principal
         $this->warehouse = Warehouse::factory()->create([
+            'tenant_id' => $this->tenant->id,
             'type' => 'bodega',
             'name' => 'Bodega Principal',
         ]);
@@ -72,6 +88,91 @@ final class InventoryWarehouseTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('inventory.warehouse');
+    }
+
+    public function test_vehicle_inventory_page_shows_create_and_delete_actions_for_manager(): void
+    {
+        $route = Route::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'code' => 'RT-TEST',
+            'name' => 'Ruta Test',
+        ]);
+
+        Warehouse::factory()->vehiculo()->create([
+            'tenant_id' => $this->tenant->id,
+            'route_id' => $route->id,
+        ]);
+
+        $response = $this->actingAs($this->managerUser)
+            ->get(route('inventory.vehicles'));
+
+        $response->assertOk();
+        $response->assertSee('Crear vehículo');
+        $response->assertSee('Eliminar');
+    }
+
+    public function test_manager_can_create_vehicle_from_vehicle_inventory_page(): void
+    {
+        $response = $this->actingAs($this->managerUser)
+            ->post(route('inventory.vehicles.store'), [
+                'name' => 'Ruta Occidente',
+                'code' => 'RT-OCC',
+                'vehicle_plate' => 'ABC123',
+            ]);
+
+        $response->assertRedirect(route('inventory.vehicles'));
+        $this->assertDatabaseHas('routes', [
+            'tenant_id' => $this->tenant->id,
+            'code' => 'RT-OCC',
+            'name' => 'Ruta Occidente',
+            'vehicle_plate' => 'ABC123',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('warehouses', [
+            'tenant_id' => $this->tenant->id,
+            'route_id' => Route::query()->where('code', 'RT-OCC')->value('id'),
+            'type' => 'vehiculo',
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_manager_can_deactivate_vehicle_from_vehicle_inventory_page(): void
+    {
+        $route = Route::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'code' => 'RT-DEL',
+            'name' => 'Ruta Eliminar',
+            'driver_user_id' => $this->managerUser->id,
+        ]);
+
+        $this->managerUser->update(['route_id' => $route->id]);
+
+        Warehouse::factory()->vehiculo()->create([
+            'tenant_id' => $this->tenant->id,
+            'route_id' => $route->id,
+            'responsible_user_id' => $this->managerUser->id,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($this->managerUser)
+            ->delete(route('inventory.vehicles.destroy', $route));
+
+        $response->assertRedirect(route('inventory.vehicles'));
+        $this->assertDatabaseHas('routes', [
+            'id' => $route->id,
+            'is_active' => false,
+            'driver_user_id' => null,
+        ]);
+        $this->assertDatabaseHas('warehouses', [
+            'route_id' => $route->id,
+            'type' => 'vehiculo',
+            'is_active' => false,
+            'responsible_user_id' => null,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'id' => $this->managerUser->id,
+            'route_id' => null,
+        ]);
     }
 
     public function test_authenticated_user_without_permission_gets_403(): void
@@ -513,6 +614,14 @@ final class InventoryWarehouseTest extends TestCase
     {
         Notification::fake();
 
+        $foreignAdmin = User::factory()->create([
+            'tenant_id' => Tenant::factory()->create()->id,
+            'email' => 'foreign-admin@example.com',
+            'must_change_password' => false,
+            'is_super_admin' => false,
+        ]);
+        $foreignAdmin->syncRoles(['admin']);
+
         $route = Route::factory()->create();
         $machine = Machine::factory()->forRoute($route->id)->create();
         $machineWarehouse = Warehouse::factory()->maquina()->create([
@@ -555,11 +664,20 @@ final class InventoryWarehouseTest extends TestCase
             InventoryAdjustmentNotification::class,
             fn (InventoryAdjustmentNotification $notification, array $channels): bool => in_array('database', $channels, true)
         );
+        Notification::assertNotSentTo($foreignAdmin, InventoryAdjustmentNotification::class);
     }
 
     public function test_manager_vehicle_adjustment_after_initial_load_requires_reason_and_notifies_admin(): void
     {
         Notification::fake();
+
+        $foreignAdmin = User::factory()->create([
+            'tenant_id' => Tenant::factory()->create()->id,
+            'email' => 'foreign-admin-vehicle@example.com',
+            'must_change_password' => false,
+            'is_super_admin' => false,
+        ]);
+        $foreignAdmin->syncRoles(['admin']);
 
         $route = Route::factory()->create();
         $vehicleWarehouse = Warehouse::factory()->vehiculo()->create([
@@ -602,6 +720,7 @@ final class InventoryWarehouseTest extends TestCase
             InventoryAdjustmentNotification::class,
             fn (InventoryAdjustmentNotification $notification, array $channels): bool => in_array('database', $channels, true)
         );
+        Notification::assertNotSentTo($foreignAdmin, InventoryAdjustmentNotification::class);
     }
 
     // ============================================================

@@ -14,15 +14,19 @@ final class MachineSale extends Model
     use BelongsToTenant;
 
     protected $fillable = [
-        'code', 'machine_id', 'registered_by', 'status',
+        'tenant_id', 'code', 'machine_id', 'registered_by', 'status',
         'offline_local_id', 'was_offline', 'notes', 'sale_date',
+        'cash_bills', 'cash_coins', 'cash_total',
     ];
 
     protected function casts(): array
     {
         return [
-            'sale_date' => 'date',
+            'sale_date'   => 'date',
             'was_offline' => 'boolean',
+            'cash_bills'  => 'integer',
+            'cash_coins'  => 'integer',
+            'cash_total'  => 'integer',
         ];
     }
 
@@ -39,5 +43,17 @@ final class MachineSale extends Model
     public function items(): HasMany
     {
         return $this->hasMany(MachineSaleItem::class);
+    }
+
+    /** Total de unidades vendidas en esta venta */
+    public function totalUnits(): int
+    {
+        return (int) $this->items->sum('quantity_sold');
+    }
+
+    /** Total de ingresos calculado desde los ítems */
+    public function totalRevenue(): float
+    {
+        return (float) $this->items->sum(fn ($i) => $i->quantity_sold * $i->unit_price);
     }
 }

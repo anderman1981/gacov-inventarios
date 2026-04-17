@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -125,8 +126,8 @@ final class MachineController extends Controller
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 
@@ -157,10 +158,11 @@ final class MachineController extends Controller
         return view('machines.index', compact('machines', 'routes', 'stockTotals'));
     }
 
-    public function show(Machine $machine): View
+    public function show(string $machine): View
     {
         abort_unless(auth()->user()?->can('machines.view'), 403);
 
+        $machine = $this->resolveMachineOrFail($machine);
         $machine->load(['route', 'operator']);
 
         // Bodega tipo 'maquina' de esta máquina
@@ -234,30 +236,33 @@ final class MachineController extends Controller
             ->with('success', 'Máquina creada correctamente.');
     }
 
-    public function edit(Machine $machine): View
+    public function edit(string $machine): View
     {
         abort_unless(auth()->user()?->can('machines.edit'), 403);
 
+        $machine = $this->resolveMachineOrFail($machine);
         $routes = Route::where('is_active', true)->orderBy('name')->get();
         $operators = User::where('is_active', true)->orderBy('name')->get();
 
         return view('machines.edit', compact('machine', 'routes', 'operators'));
     }
 
-    public function update(MachineRequest $request, Machine $machine): RedirectResponse
+    public function update(MachineRequest $request, string $machine): RedirectResponse
     {
         abort_unless(auth()->user()?->can('machines.edit'), 403);
 
+        $machine = $this->resolveMachineOrFail($machine);
         $machine->update($request->validated());
 
         return redirect()->route('machines.show', $machine)
             ->with('success', 'Máquina actualizada correctamente.');
     }
 
-    public function toggle(Machine $machine): RedirectResponse
+    public function toggle(string $machine): RedirectResponse
     {
         abort_unless(auth()->user()?->can('machines.edit'), 403);
 
+        $machine = $this->resolveMachineOrFail($machine);
         $machine->update(['is_active' => ! $machine->is_active]);
         $estado = $machine->is_active ? 'activada' : 'desactivada';
 
@@ -270,5 +275,20 @@ final class MachineController extends Controller
             auth()->user()?->can('machines.create') || auth()->user()?->can('inventory.load_excel'),
             403
         );
+    }
+
+    private function resolveMachineOrFail(string $machineIdentifier): Machine
+    {
+        $machine = Machine::withoutGlobalScopes()
+            ->with(['route', 'operator'])
+            ->findOrFail($machineIdentifier);
+
+        $user = auth()->user();
+
+        if ($user !== null && ! $user->is_super_admin && (int) $user->tenant_id !== (int) $machine->tenant_id) {
+            abort(404);
+        }
+
+        return $machine;
     }
 }

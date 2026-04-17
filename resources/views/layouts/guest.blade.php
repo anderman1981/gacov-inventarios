@@ -6,9 +6,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Acceso' }} — Inversiones GACOV S.A.S.</title>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#00D4FF">
+    <meta name="theme-color" content="#D71920">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    @php($hasViteAssets = file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
+    @if($hasViteAssets)
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @endif
 </head>
 <body>
     <div class="auth-wrapper">

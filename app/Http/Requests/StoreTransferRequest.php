@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class StoreTransferRequest extends FormRequest
 {
@@ -16,8 +17,21 @@ final class StoreTransferRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'origin_warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
-            'destination_warehouse_id' => ['required', 'integer', 'exists:warehouses,id', 'different:origin_warehouse_id'],
+            'origin_warehouse_id' => [
+                'required',
+                'integer',
+                Rule::exists('warehouses', 'id')->where(function ($query): void {
+                    $query->whereIn('type', ['bodega', 'vehiculo']);
+                }),
+            ],
+            'destination_warehouse_id' => [
+                'required',
+                'integer',
+                Rule::exists('warehouses', 'id')->where(function ($query): void {
+                    $query->where('type', 'maquina');
+                }),
+                'different:origin_warehouse_id',
+            ],
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],

@@ -30,7 +30,10 @@ final class ReassignRouteRequest extends FormRequest
                     return;
                 }
 
-                $driver = User::query()->whereKey($this->integer('target_driver_id'))->first();
+                $driver = User::query()
+                    ->where('tenant_id', $this->user()?->tenant_id)
+                    ->whereKey($this->integer('target_driver_id'))
+                    ->first();
 
                 if (! $driver?->hasRole('conductor')) {
                     $validator->errors()->add('target_driver_id', 'Solo puedes asignar rutas a usuarios con rol de conductor.');

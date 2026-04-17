@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Domain\Tenant\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class StockMovement extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, HasFactory;
 
     // Registro inmutable de auditoría: solo created_at, sin updated_at
     public const CREATED_AT = 'created_at';

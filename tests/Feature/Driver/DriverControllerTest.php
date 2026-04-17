@@ -7,6 +7,7 @@ namespace Tests\Feature\Driver;
 use App\Domain\Tenant\Services\TenantContext;
 use App\Models\AppModule;
 use App\Models\Machine;
+use App\Models\MachineStockingRecord;
 use App\Models\Product;
 use App\Models\Route;
 use App\Models\RouteScheduleAssignment;
@@ -194,7 +195,7 @@ final class DriverControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('driver.stocking.create');
         $response->assertDontSee('Carga por foto para surtido');
-        $response->assertSee('Surtido manual para conductor.');
+        $response->assertSee('Fase 1 — Inspección de máquina.');
         $response->assertSee('Ubicación de la máquina');
         $response->assertSee('Productos a surtir');
     }
@@ -241,8 +242,32 @@ final class DriverControllerTest extends TestCase
             'items' => [$product->id => ['quantity' => 3]],
         ]);
 
-        $response->assertRedirect(route('driver.dashboard', ['route_id' => $this->route->id]));
+        $record = MachineStockingRecord::query()->latest('id')->firstOrFail();
+
+        $response->assertRedirect(route('driver.stocking.loading', $record));
         $response->assertSessionHas('success');
+    }
+
+    public function test_driver_can_open_stocking_loading_view(): void
+    {
+        $record = MachineStockingRecord::query()->create([
+            'tenant_id' => $this->tenant->id,
+            'code' => 'STK-001',
+            'machine_id' => $this->machine->id,
+            'route_id' => $this->route->id,
+            'vehicle_warehouse_id' => $this->vehicleWarehouse->id,
+            'performed_by' => $this->driver->id,
+            'status' => MachineStockingRecord::STATUS_PENDIENTE_CARGA,
+            'notes' => null,
+            'started_at' => now(),
+            'was_offline' => false,
+        ]);
+
+        $response = $this->actingAs($this->driver)->get(route('driver.stocking.loading', $record));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('driver.stocking.loading');
+        $response->assertSee('Cargar el vehículo');
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -397,12 +422,11 @@ final class DriverControllerTest extends TestCase
     // VEHICLE INVENTORY
     // ──────────────────────────────────────────────────────────────
 
-    public function test_driver_can_access_vehicle_inventory(): void
+    public function test_driver_cannot_access_vehicle_inventory(): void
     {
         $response = $this->actingAs($this->driver)->get(route('driver.inventory'));
 
-        $response->assertStatus(200);
-        $response->assertViewIs('driver.vehicle-inventory');
+        $response->assertForbidden();
     }
 
     public function test_vehicle_inventory_shows_only_positive_stock(): void
@@ -415,15 +439,7 @@ final class DriverControllerTest extends TestCase
 
         // Act & Assert
         $response = $this->actingAs($this->driver)->get(route('driver.inventory'));
-        $response->assertStatus(200);
-
-        // Verify stocks are filtered (quantity > 0)
-        $stocks = $response->viewData('stocks');
-        if ($stocks !== null && $stocks->isNotEmpty()) {
-            $this->assertSame('Con Stock', $stocks->first()->product->name);
-        }
-        // Note: The exact stock count assertion may fail due to tenant scoping in tests
-        // The important thing is that the page loads and shows products with positive stock
+        $response->assertForbidden();
     }
 
     public function test_vehicle_inventory_empty_when_no_warehouse(): void
@@ -437,10 +453,7 @@ final class DriverControllerTest extends TestCase
 
         $response = $this->actingAs($driverNoRoute)->get(route('driver.inventory'));
 
-        $response->assertStatus(200);
-        $response->assertViewHas('stocks');
-        $stocks = $response->viewData('stocks');
-        $this->assertCount(0, $stocks);
+        $response->assertForbidden();
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -10,8 +10,17 @@ Route::middleware(['auth', 'tenant'])->prefix('driver')->name('driver.')->group(
         ->name('dashboard');
 
     Route::middleware('module:drivers')->group(function (): void {
+        // Fase 1 — Inspección
         Route::get('/stocking/create', [DriverController::class, 'stocking'])->name('stocking.create');
         Route::post('/stocking', [DriverController::class, 'storeStocking'])->name('stocking.store');
+
+        // Fase 2 — Carga del vehículo
+        Route::get('/stocking/{record}/loading', [DriverController::class, 'stockingLoading'])->name('stocking.loading');
+        Route::post('/stocking/{record}/confirm-load', [DriverController::class, 'stockingConfirmLoad'])->name('stocking.confirm-load');
+
+        // Fase 3 — Surtido de la máquina
+        Route::get('/stocking/{record}/stock', [DriverController::class, 'stockingStock'])->name('stocking.stock');
+        Route::post('/stocking/{record}/complete', [DriverController::class, 'stockingComplete'])->name('stocking.complete');
     });
 
     Route::middleware('module:sales')->group(function (): void {

@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Stock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\View\View;
 
 final class ProductController extends Controller
@@ -27,10 +28,10 @@ final class ProductController extends Controller
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('worldoffice_code', 'like', "%{$search}%")
-                    ->orWhere('id', 'like', "%{$search}%");
+                $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('worldoffice_code', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('id', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 

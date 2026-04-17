@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class MachineSaleItem extends Model
 {
+    use BelongsToTenant;
+
     public $timestamps = false;
 
     protected $fillable = [
-        'machine_sale_id', 'product_id', 'quantity_sold', 'unit_price', 'notes',
+        'tenant_id', 'machine_sale_id', 'product_id', 'quantity_sold', 'unit_price', 'notes',
     ];
 
     protected function casts(): array

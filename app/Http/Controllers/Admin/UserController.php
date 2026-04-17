@@ -12,6 +12,7 @@ use App\Models\Route;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
@@ -29,8 +30,8 @@ final class UserController extends Controller
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('email', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }
 
@@ -196,6 +197,8 @@ final class UserController extends Controller
 
     public function accessProfiles(): View
     {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
         return view('pages.acceso-por-perfil');
     }
 

@@ -91,8 +91,8 @@
         <div class="alert alert-info" style="margin-bottom:var(--space-5)">
             <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-3a1 1 0 10-2 0 1 1 0 002 0zm-2 3a1 1 0 000 2v2a1 1 0 102 0v-2a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
             <div>
-                <strong>Surtido manual para conductor.</strong>
-                Registra aquí las cantidades que vas a cargar en la máquina seleccionada.
+                <strong>Fase 1 — Inspección de máquina.</strong>
+                Inspecciona la máquina e indica cuántas unidades de cada producto necesita. Después ve al vehículo a cargarlos.
             </div>
         </div>
 
@@ -158,7 +158,7 @@
             <div style="margin-bottom:var(--space-6)">
                 <p class="form-label" style="margin-bottom:var(--space-3)">Productos a surtir</p>
                 <p style="font-size:12px;color:var(--gacov-text-muted);margin-bottom:var(--space-4)">
-                    Ingresa solo las cantidades que vas a surtir. Deja en 0 los que no va a cargar.
+                    Ingresa las cantidades que necesita la máquina. Los productos sin disponibilidad en el vehículo aparecen bloqueados.
                 </p>
                 <div class="table-scroll">
                 <table class="data-table">
@@ -166,7 +166,6 @@
                         <tr>
                             <th>Producto</th>
                             <th>Unidad</th>
-                            <th style="text-align:center">Disponible en vehículo</th>
                             <th style="text-align:center;width:140px">Cantidad a surtir</th>
                         </tr>
                     </thead>
@@ -174,19 +173,21 @@
                         @foreach($products as $product)
                         @php
                             $productCode = strtoupper(trim((string) $product->code));
+                            $hasStock = (int) $product->vehicle_stock > 0;
                         @endphp
-                        <tr class="stocking-product-row" data-code="{{ $productCode }}">
+                        <tr class="stocking-product-row{{ !$hasStock ? ' stocking-product-row--no-stock' : '' }}" data-code="{{ $productCode }}">
                             <td>
                                 <strong>{{ $product->name }}</strong>
                                 <div style="font-size:11px;color:var(--gacov-text-muted);margin-top:2px">{{ $productCode }}</div>
+                                @if(!$hasStock)
+                                <span style="font-size:11px;color:var(--gacov-error);font-weight:600;display:inline-block;margin-top:3px">
+                                    ✕ Sin stock en vehículo
+                                </span>
+                                @endif
                             </td>
                             <td style="color:var(--gacov-text-muted)">{{ $product->unit }}</td>
-                            <td style="text-align:center">
-                                <span style="font-weight:600;color:{{ $product->vehicle_stock < 5 ? 'var(--gacov-error)' : ($product->vehicle_stock < 15 ? 'var(--gacov-warning)' : 'var(--gacov-success)') }}">
-                                    {{ number_format((float) $product->vehicle_stock, 0, ',', '.') }}
-                                </span>
-                            </td>
                             <td>
+                                @if($hasStock)
                                 <input type="number"
                                        name="items[{{ $product->id }}][quantity]"
                                        value="{{ old("items.{$product->id}.quantity", 0) }}"
@@ -197,6 +198,10 @@
                                        data-quantity-input="true"
                                        class="form-input"
                                        style="text-align:center;padding:6px 8px">
+                                @else
+                                <input type="hidden" name="items[{{ $product->id }}][quantity]" value="0">
+                                <span style="font-size:12px;color:var(--gacov-text-disabled);font-style:italic">No disponible</span>
+                                @endif
                             </td>
                         </tr>
                         @endforeach
@@ -227,7 +232,7 @@
 
             <div style="display:flex;gap:var(--space-3);padding-top:var(--space-4);border-top:1px solid var(--gacov-border)">
                 <button type="submit" class="btn btn-primary" style="width:auto" {{ !$vehicleWarehouse ? 'disabled' : '' }}>
-                    Registrar surtido
+                    Continuar → Ir a cargar
                 </button>
                 <a href="{{ route('driver.dashboard', $routeQuery) }}" class="btn" style="width:auto;background:var(--gacov-bg-elevated);color:var(--gacov-text-primary)">
                     Cancelar

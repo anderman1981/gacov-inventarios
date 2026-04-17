@@ -16,13 +16,18 @@ final class Machine extends Model
     use BelongsToTenant, HasFactory;
 
     protected $fillable = [
-        'code', 'worldoffice_code', 'name', 'location',
+        'tenant_id', 'code', 'worldoffice_code', 'name', 'location',
         'route_id', 'operator_user_id', 'type', 'is_active',
+        'latitude', 'longitude',
     ];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return [
+            'is_active' => 'boolean',
+            'latitude' => 'decimal:8',
+            'longitude' => 'decimal:8',
+        ];
     }
 
     public function route(): BelongsTo

@@ -24,8 +24,24 @@ final class RoleAccessMatrixTest extends TestCase
         $this->actingAs($admin)->get(route('inventory.adjust'))->assertOk();
         $this->actingAs($admin)->get(route('operations.routes.board'))->assertOk();
         $this->actingAs($admin)->get(route('operations.routes.calendar'))->assertOk();
+        $this->actingAs($admin)->get(route('worldoffice.index'))->assertOk();
+        $this->actingAs($admin)->get(route('inventory.vehicles'))->assertOk();
+        $this->actingAs($admin)->get(route('driver.inventory'))->assertOk();
+        $this->actingAs($admin)->get(route('admin.users.access-profiles'))->assertForbidden();
+        $this->actingAs($admin)->get(route('invoices.index'))->assertOk();
+        $this->actingAs($admin)->get(route('invoices.create'))->assertForbidden();
         $this->actingAs($admin)->get(route('machines.index'))->assertRedirect(route('dashboard'));
         $this->actingAs($admin)->get(route('driver.stocking.create'))->assertForbidden();
+    }
+
+    public function test_super_admin_can_view_access_profiles(): void
+    {
+        [$tenant, $route] = $this->seedTenantContext();
+
+        $superAdmin = $this->makeTenantUser($tenant, 'super_admin', 'super-admin-role-test@example.com', $route);
+        $superAdmin->update(['is_super_admin' => true]);
+
+        $this->actingAs($superAdmin)->get(route('admin.users.access-profiles'))->assertOk();
     }
 
     public function test_manager_only_gets_inventory_machines_and_reports_access(): void
@@ -36,14 +52,18 @@ final class RoleAccessMatrixTest extends TestCase
 
         $this->actingAs($manager)->get(route('machines.index'))->assertOk();
         $this->actingAs($manager)->get(route('inventory.movements'))->assertOk();
+        $this->actingAs($manager)->get(route('transfers.index'))->assertOk();
+        $this->actingAs($manager)->get(route('transfers.create'))->assertOk();
         $this->actingAs($manager)->get(route('inventory.vehicles'))->assertOk();
         $this->actingAs($manager)->get(route('inventory.vehicles.import.form'))->assertOk();
         $this->actingAs($manager)->get(route('inventory.machines'))->assertOk();
         $this->actingAs($manager)->get(route('inventory.machines.import.form'))->assertOk();
         $this->actingAs($manager)->get(route('operations.routes.board'))->assertOk();
         $this->actingAs($manager)->get(route('operations.routes.calendar'))->assertOk();
+        $this->actingAs($manager)->get(route('worldoffice.index'))->assertOk();
+        $this->actingAs($manager)->get(route('driver.sales.create'))->assertOk();
+        $this->actingAs($manager)->get(route('invoices.index'))->assertRedirect(route('dashboard'));
         $this->actingAs($manager)->get(route('admin.users.index'))->assertRedirect(route('dashboard'));
-        $this->actingAs($manager)->get(route('driver.sales.create'))->assertRedirect(route('dashboard'));
     }
 
     public function test_contador_is_limited_to_read_only_financial_views(): void
@@ -54,6 +74,9 @@ final class RoleAccessMatrixTest extends TestCase
 
         $this->actingAs($contador)->get(route('dashboard'))->assertOk();
         $this->actingAs($contador)->get(route('inventory.movements'))->assertOk();
+        $this->actingAs($contador)->get(route('worldoffice.index'))->assertOk();
+        $this->actingAs($contador)->get(route('invoices.index'))->assertOk();
+        $this->actingAs($contador)->get(route('invoices.create'))->assertForbidden();
         $this->actingAs($contador)->get(route('inventory.warehouse'))->assertRedirect(route('dashboard'));
         $this->actingAs($contador)->get(route('machines.index'))->assertRedirect(route('dashboard'));
         $this->actingAs($contador)->get(route('driver.sales.create'))->assertForbidden();
@@ -68,7 +91,8 @@ final class RoleAccessMatrixTest extends TestCase
         $this->actingAs($conductor)->get(route('driver.dashboard'))->assertOk();
         $this->actingAs($conductor)->get(route('driver.stocking.create'))->assertOk();
         $this->actingAs($conductor)->get(route('driver.sales.create'))->assertOk();
-        $this->actingAs($conductor)->get(route('driver.inventory'))->assertOk();
+        $this->actingAs($conductor)->get(route('worldoffice.index'))->assertForbidden();
+        $this->actingAs($conductor)->get(route('driver.inventory'))->assertForbidden();
         $this->actingAs($conductor)->get(route('inventory.warehouse'))->assertRedirect(route('dashboard'));
         $this->actingAs($conductor)->get(route('admin.users.index'))->assertRedirect(route('dashboard'));
     }
@@ -78,69 +102,23 @@ final class RoleAccessMatrixTest extends TestCase
      */
     private function seedTenantContext(): array
     {
-        AppModule::query()->create([
-            'key' => 'dashboard',
-            'name' => 'Dashboard',
-            'phase_required' => 1,
-            'sort_order' => 1,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'users',
-            'name' => 'Usuarios',
-            'phase_required' => 1,
-            'sort_order' => 2,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'inventory',
-            'name' => 'Inventario',
-            'phase_required' => 1,
-            'sort_order' => 3,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'products',
-            'name' => 'Productos',
-            'phase_required' => 1,
-            'sort_order' => 4,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'machines',
-            'name' => 'Máquinas',
-            'phase_required' => 1,
-            'sort_order' => 5,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'transfers',
-            'name' => 'Traslados',
-            'phase_required' => 1,
-            'sort_order' => 6,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'drivers',
-            'name' => 'Conductores',
-            'phase_required' => 1,
-            'sort_order' => 7,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'sales',
-            'name' => 'Ventas',
-            'phase_required' => 2,
-            'sort_order' => 8,
-            'is_active' => true,
-        ]);
-        AppModule::query()->create([
-            'key' => 'reports',
-            'name' => 'Reportes',
-            'phase_required' => 2,
-            'sort_order' => 9,
-            'is_active' => true,
-        ]);
+        foreach ([
+            ['key' => 'dashboard', 'name' => 'Dashboard', 'phase_required' => 1, 'sort_order' => 1],
+            ['key' => 'users', 'name' => 'Usuarios', 'phase_required' => 1, 'sort_order' => 2],
+            ['key' => 'inventory', 'name' => 'Inventario', 'phase_required' => 1, 'sort_order' => 3],
+            ['key' => 'products', 'name' => 'Productos', 'phase_required' => 1, 'sort_order' => 4],
+            ['key' => 'machines', 'name' => 'Máquinas', 'phase_required' => 1, 'sort_order' => 5],
+            ['key' => 'transfers', 'name' => 'Traslados', 'phase_required' => 1, 'sort_order' => 6],
+            ['key' => 'drivers', 'name' => 'Conductores', 'phase_required' => 1, 'sort_order' => 7],
+            ['key' => 'sales', 'name' => 'Ventas', 'phase_required' => 2, 'sort_order' => 8],
+            ['key' => 'reports', 'name' => 'Reportes', 'phase_required' => 2, 'sort_order' => 9],
+            ['key' => 'invoices', 'name' => 'Facturas', 'phase_required' => 1, 'sort_order' => 10],
+        ] as $module) {
+            AppModule::query()->updateOrCreate(
+                ['key' => $module['key']],
+                array_merge($module, ['is_active' => true])
+            );
+        }
 
         $tenant = Tenant::factory()->create();
         TenantBillingProfile::create([

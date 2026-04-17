@@ -9,18 +9,22 @@
         <p class="page-subtitle">Reasigna rutas entre conductores con drag and drop para cubrir rotaciones, festivos o ausencias.</p>
     </div>
     <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+        <a href="{{ route('operations.routes.create') }}" class="btn btn-primary" style="width:auto">
+            Añadir ruta
+        </a>
         <a href="{{ route('operations.routes.calendar') }}" class="btn btn-primary" style="width:auto">
             Calendario operativo
         </a>
     </div>
 </div>
 
-<div class="alert alert-info" style="margin-bottom:var(--space-6)">
-    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-3a1 1 0 10-2 0 1 1 0 002 0zm-2 3a1 1 0 000 2v2a1 1 0 102 0v-2a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
-    <div>
-        <strong>Cómo funciona.</strong>
-        Arrastra una ruta hacia otro conductor para moverla. Si el conductor destino ya tiene una ruta activa, el sistema hará el intercambio automáticamente.
+<div class="inventory-command-bar">
+    <div class="inventory-command-bar__meta">
+        <span class="badge badge-info">Drag & drop activo</span>
+        <span class="badge badge-neutral">Intercambio automático</span>
+        <span class="badge badge-neutral">Sin asignar disponible</span>
     </div>
+    <div class="badge badge-neutral">Arrastra una ruta para moverla entre conductores</div>
 </div>
 
 <div class="route-board" data-route-assignment-board>
@@ -41,6 +45,18 @@
                 <div class="route-card__meta">
                     <span>{{ $route->vehicle_plate ?: 'Sin placa' }}</span>
                     <span>{{ $route->machines_count }} máquina(s)</span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                    <a href="{{ route('operations.routes.edit', $route) }}" class="amr-icon-button amr-icon-button--primary amr-tooltip-trigger" data-tooltip="Editar ruta" aria-label="Editar ruta">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3a2 2 0 012.828 0l.586.586a2 2 0 010 2.828l-8.293 8.293a1 1 0 01-.465.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.465L13.586 3zM12 5.414L7.5 9.914 7.086 11.5l1.586-.414L13.172 6l-1.172-1.172z"/></svg>
+                    </a>
+                    <form method="POST" action="{{ route('operations.routes.destroy', $route) }}" onsubmit="return confirm('¿Quieres quitar esta ruta del sistema?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="amr-icon-button amr-icon-button--danger amr-tooltip-trigger" data-tooltip="Quitar ruta" aria-label="Quitar ruta">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 2a2 2 0 00-2 2v1H4a1 1 0 100 2h.5l.8 9.2A2 2 0 007.3 18h5.4a2 2 0 001.99-1.8L15.5 7H16a1 1 0 100-2h-2V4a2 2 0 00-2-2H8zm2 3a1 1 0 10-2 0v1h2V5zm-2 4a1 1 0 012 0v5a1 1 0 11-2 0V9z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </form>
                 </div>
             </article>
             @empty
@@ -70,6 +86,18 @@
                 <div class="route-card__meta">
                     <span>{{ $assignedRoute->vehicle_plate ?: 'Sin placa' }}</span>
                     <span>{{ $assignedRoute->machines_count }} máquina(s)</span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                    <a href="{{ route('operations.routes.edit', $assignedRoute) }}" class="amr-icon-button amr-icon-button--primary amr-tooltip-trigger" data-tooltip="Editar ruta" aria-label="Editar ruta">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3a2 2 0 012.828 0l.586.586a2 2 0 010 2.828l-8.293 8.293a1 1 0 01-.465.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.465L13.586 3zM12 5.414L7.5 9.914 7.086 11.5l1.586-.414L13.172 6l-1.172-1.172z"/></svg>
+                    </a>
+                    <form method="POST" action="{{ route('operations.routes.destroy', $assignedRoute) }}" onsubmit="return confirm('¿Quieres quitar esta ruta del sistema?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="amr-icon-button amr-icon-button--danger amr-tooltip-trigger" data-tooltip="Quitar ruta" aria-label="Quitar ruta">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 2a2 2 0 00-2 2v1H4a1 1 0 100 2h.5l.8 9.2A2 2 0 007.3 18h5.4a2 2 0 001.99-1.8L15.5 7H16a1 1 0 100-2h-2V4a2 2 0 00-2-2H8zm2 3a1 1 0 10-2 0v1h2V5zm-2 4a1 1 0 012 0v5a1 1 0 11-2 0V9z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </form>
                 </div>
             </article>
             @else

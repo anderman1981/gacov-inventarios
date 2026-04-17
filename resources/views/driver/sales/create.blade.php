@@ -78,6 +78,7 @@
                     <thead>
                         <tr>
                             <th>Producto</th>
+                            <th>Unidad</th>
                             <th style="text-align:right">Precio unit. (COP)</th>
                             <th style="text-align:center;width:140px">Cantidad vendida</th>
                             <th style="text-align:right">Subtotal</th>
@@ -86,7 +87,11 @@
                     <tbody>
                         @foreach($products as $product)
                         <tr>
-                            <td><strong>{{ $product->name }}</strong></td>
+                            <td>
+                                <strong>{{ $product->name }}</strong>
+                                <div style="font-size:11px;color:var(--gacov-text-muted);margin-top:2px">{{ $product->code }}</div>
+                            </td>
+                            <td style="color:var(--gacov-text-muted)">{{ $product->unit }}</td>
                             <td style="text-align:right">
                                 <input type="hidden" name="items[{{ $product->id }}][unit_price]" value="{{ $product->unit_price }}">
                                 ${{ number_format((float)$product->unit_price, 0, ',', '.') }}

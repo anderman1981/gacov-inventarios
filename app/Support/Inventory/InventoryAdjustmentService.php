@@ -114,9 +114,18 @@ final class InventoryAdjustmentService
      */
     public function adminRecipients(?int $excludedUserId = null): Collection
     {
+        $actor = auth()->user();
+        $tenantId = $actor?->tenant_id;
+
         return User::query()
             ->where('is_active', true)
             ->when($excludedUserId !== null, fn ($query) => $query->whereKeyNot($excludedUserId))
+            ->when($tenantId !== null, function ($query) use ($tenantId): void {
+                $query->where(function ($nestedQuery) use ($tenantId): void {
+                    $nestedQuery->where('tenant_id', $tenantId)
+                        ->orWhere('is_super_admin', true);
+                });
+            })
             ->whereHas('roles', fn ($query) => $query->whereIn('name', ['admin', 'super_admin']))
             ->get();
     }

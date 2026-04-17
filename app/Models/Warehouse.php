@@ -26,7 +26,7 @@ final class Warehouse extends Model
     protected static ?string $activityLogName = 'warehouses';
 
     protected $fillable = [
-        'name', 'code', 'type', 'route_id', 'machine_id',
+        'tenant_id', 'name', 'code', 'type', 'route_id', 'machine_id',
         'responsible_user_id', 'is_active',
     ];
 
@@ -38,6 +38,11 @@ final class Warehouse extends Model
     public function route(): BelongsTo
     {
         return $this->belongsTo(Route::class);
+    }
+
+    public function responsible(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsible_user_id');
     }
 
     public function stocks(): HasMany

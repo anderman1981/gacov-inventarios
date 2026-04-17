@@ -3,7 +3,13 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\MachineController;
+use App\Http\Controllers\MachineSalesReviewController;
 use Illuminate\Support\Facades\Route;
+
+// Revisión gerencial de ventas — sin restricción de módulo 'machines'
+Route::middleware(['auth', 'tenant'])
+    ->get('machines/sales-review', [MachineSalesReviewController::class, 'index'])
+    ->name('machines.sales.review');
 
 Route::middleware(['auth', 'tenant', 'module:machines'])->group(function () {
     Route::get('machines/import', [MachineController::class, 'importForm'])->name('machines.import.form');

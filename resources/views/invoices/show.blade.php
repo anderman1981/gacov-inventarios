@@ -7,7 +7,7 @@
     <div class="page-header-left">
         <a href="{{ route('invoices.index') }}" class="back-link">
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
-            Volver a facturas
+            Volver a facturación
         </a>
         <h1>Factura {{ $invoice->full_number }}</h1>
         <div class="invoice-meta">
@@ -16,30 +16,30 @@
         </div>
     </div>
     <div class="page-header-actions">
-        @if($invoice->status === 'draft')
-        <form action="{{ route('invoices.issue', $invoice) }}" method="POST" class="inline">
-            @csrf
-            <button type="submit" class="btn btn-success">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                Emitir Factura
-            </button>
-        </form>
-        <a href="{{ route('invoices.edit', $invoice) }}" class="btn btn-secondary">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
-            Editar
-        </a>
-        @endif
-        @if($invoice->status === 'issued')
         <a href="{{ route('invoices.pdf', $invoice) }}" class="btn btn-secondary">
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             Descargar PDF
         </a>
-        @endif
-        @if($invoice->status !== 'paid' && $invoice->status !== 'cancelled')
-        <form action="{{ route('invoices.cancel', $invoice) }}" method="POST" class="inline" onsubmit="return confirm('¿Cancelar esta factura?');">
-            @csrf
-            <button type="submit" class="btn btn-danger">Cancelar</button>
-        </form>
+        @if(auth()->user()?->isSuperAdmin())
+            @if($invoice->status === 'draft')
+            <form action="{{ route('invoices.issue', $invoice) }}" method="POST" class="inline">
+                @csrf
+                <button type="submit" class="btn btn-success">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    Emitir Factura
+                </button>
+            </form>
+            <a href="{{ route('invoices.edit', $invoice) }}" class="btn btn-secondary">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                Editar
+            </a>
+            @endif
+            @if($invoice->status !== 'paid' && $invoice->status !== 'cancelled')
+            <form action="{{ route('invoices.cancel', $invoice) }}" method="POST" class="inline" onsubmit="return confirm('¿Cancelar esta factura?');">
+                @csrf
+                <button type="submit" class="btn btn-danger">Cancelar</button>
+            </form>
+            @endif
         @endif
     </div>
 </div>
@@ -65,7 +65,7 @@
         </div>
 
         <div class="invoice-info">
-            <h3>FACTURA DE VENTA</h3>
+            <h3>COMPROBANTE DEL SISTEMA</h3>
             <div class="invoice-number">{{ $invoice->full_number }}</div>
             <table class="info-table">
                 <tr>
@@ -255,7 +255,7 @@
     @endif
 
     {{-- Register Payment --}}
-    @if($invoice->status === 'issued' && $invoice->balance_due > 0)
+    @if(auth()->user()?->isSuperAdmin() && $invoice->status === 'issued' && $invoice->balance_due > 0)
     <div class="register-payment">
         <h4>Registrar Pago</h4>
         <form action="{{ route('invoices.payments.store', $invoice) }}" method="POST" class="payment-form">

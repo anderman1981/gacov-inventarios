@@ -12,6 +12,8 @@ final class DatabaseSeeder extends Seeder
     {
         $this->call([
             RoleSeeder::class,
+            DefaultTenantSeeder::class,
+            ContractAgreementSeeder::class,
             ProductSeeder::class,
             InitialDataSeeder::class,
         ]);

@@ -14,6 +14,7 @@ use App\Models\TransferOrderItem;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\SearchHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -31,7 +32,7 @@ final class TransferController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->where('code', 'like', "%{$search}%");
+            $query->where('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
         }
 
         $transfers = $query->paginate(15)->withQueryString();
@@ -52,6 +53,14 @@ final class TransferController extends Controller
         abort_unless(auth()->user()?->can('transfers.create'), 403);
 
         $warehouses = Warehouse::where('is_active', true)->orderBy('name')->get();
+        $originWarehouses = Warehouse::where('is_active', true)
+            ->whereIn('type', ['bodega', 'vehiculo'])
+            ->orderBy('name')
+            ->get();
+        $destinationWarehouses = Warehouse::where('is_active', true)
+            ->where('type', 'maquina')
+            ->orderBy('name')
+            ->get();
         $products = Product::where('is_active', true)->orderBy('name')->get();
 
         // Cargar stock de todas las bodegas activas para mostrar disponibilidad
@@ -60,7 +69,13 @@ final class TransferController extends Controller
             ->groupBy('warehouse_id')
             ->map(fn ($items) => $items->keyBy('product_id'));
 
-        return view('transfers.create', compact('warehouses', 'products', 'allStocks'));
+        return view('transfers.create', compact(
+            'warehouses',
+            'originWarehouses',
+            'destinationWarehouses',
+            'products',
+            'allStocks'
+        ));
     }
 
     public function store(StoreTransferRequest $request): RedirectResponse
@@ -106,9 +121,11 @@ final class TransferController extends Controller
             ->with('success', "Orden de traslado {$code} creada exitosamente.");
     }
 
-    public function show(TransferOrder $transfer): View
+    public function show(string $transfer): View
     {
         abort_unless(auth()->user()?->can('transfers.view'), 403);
+
+        $transfer = $this->resolveTransferOrFail($transfer);
 
         $transfer->load([
             'originWarehouse',
@@ -122,9 +139,11 @@ final class TransferController extends Controller
         return view('transfers.show', compact('transfer'));
     }
 
-    public function approve(TransferOrder $transfer): RedirectResponse
+    public function approve(string $transfer): RedirectResponse
     {
         abort_unless(auth()->user()?->can('transfers.approve'), 403);
+
+        $transfer = $this->resolveTransferOrFail($transfer);
 
         if ($transfer->status !== 'pendiente') {
             return back()->withErrors(['status' => 'Solo se pueden aprobar traslados en estado pendiente.']);
@@ -140,9 +159,11 @@ final class TransferController extends Controller
             ->with('success', "Traslado {$transfer->code} aprobado exitosamente.");
     }
 
-    public function complete(CompleteTransferRequest $request, TransferOrder $transfer): RedirectResponse
+    public function complete(CompleteTransferRequest $request, string $transfer): RedirectResponse
     {
         abort_unless(auth()->user()?->can('transfers.complete'), 403);
+
+        $transfer = $this->resolveTransferOrFail($transfer);
 
         if ($transfer->status !== 'aprobado') {
             return back()->withErrors(['status' => 'Solo se pueden completar traslados en estado aprobado.']);
@@ -217,9 +238,11 @@ final class TransferController extends Controller
             ->with('success', "Traslado {$transfer->code} completado exitosamente.");
     }
 
-    public function cancel(TransferOrder $transfer): RedirectResponse
+    public function cancel(string $transfer): RedirectResponse
     {
         abort_unless(auth()->user()?->can('transfers.create'), 403);
+
+        $transfer = $this->resolveTransferOrFail($transfer);
 
         if ($transfer->status !== 'pendiente') {
             return back()->withErrors(['status' => 'Solo se pueden cancelar traslados en estado pendiente.']);
@@ -229,5 +252,16 @@ final class TransferController extends Controller
 
         return redirect()->route('transfers.index')
             ->with('success', "Traslado {$transfer->code} cancelado.");
+    }
+
+    private function resolveTransferOrFail(string $transferIdentifier): TransferOrder
+    {
+        $query = TransferOrder::query();
+
+        if (ctype_digit($transferIdentifier)) {
+            return $query->whereKey((int) $transferIdentifier)->firstOrFail();
+        }
+
+        return $query->where('code', $transferIdentifier)->firstOrFail();
     }
 }
