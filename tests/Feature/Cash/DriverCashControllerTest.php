@@ -47,6 +47,69 @@ final class DriverCashControllerTest extends TestCase
             ->assertSee('Entrega base de prueba');
     }
 
+    public function test_cash_index_defaults_to_authenticated_users_route(): void
+    {
+        [$tenant, $route, $manager, $driver] = $this->seedTenantContext();
+
+        $otherRoute = ClientRoute::factory()->create([
+            'tenant_id' => $tenant->id,
+            'is_active' => true,
+            'name' => 'Ruta Alterna',
+            'code' => 'RT-ALT',
+        ]);
+
+        $manager->update(['route_id' => $route->id]);
+
+        DriverCashDelivery::create([
+            'tenant_id' => $tenant->id,
+            'route_id' => $route->id,
+            'driver_user_id' => $driver->id,
+            'delivered_by_user_id' => $manager->id,
+            'delivery_date' => now()->toDateString(),
+            'bill_100000' => 1,
+            'bill_50000' => 0,
+            'bill_20000' => 0,
+            'bill_10000' => 0,
+            'bill_5000' => 0,
+            'bill_2000' => 0,
+            'bill_1000' => 0,
+            'coin_1000' => 0,
+            'coin_500' => 0,
+            'coin_200' => 0,
+            'coin_100' => 0,
+            'coin_50' => 0,
+        ]);
+
+        DriverCashDelivery::create([
+            'tenant_id' => $tenant->id,
+            'route_id' => $otherRoute->id,
+            'driver_user_id' => $driver->id,
+            'delivered_by_user_id' => $manager->id,
+            'delivery_date' => now()->toDateString(),
+            'bill_100000' => 2,
+            'bill_50000' => 0,
+            'bill_20000' => 0,
+            'bill_10000' => 0,
+            'bill_5000' => 0,
+            'bill_2000' => 0,
+            'bill_1000' => 0,
+            'coin_1000' => 0,
+            'coin_500' => 0,
+            'coin_200' => 0,
+            'coin_100' => 0,
+            'coin_50' => 0,
+        ]);
+
+        $response = $this->actingAs($manager->fresh())->get(route('cash.index'));
+
+        $response->assertRedirect(route('cash.index', ['route_id' => $route->id]));
+
+        $followed = $this->actingAs($manager->fresh())->followingRedirects()->get(route('cash.index'));
+        $followed->assertOk();
+        $followed->assertSee('Filtro activo');
+        $followed->assertSee($route->name);
+    }
+
     /**
      * @return array{0: Tenant, 1: ClientRoute, 2: User, 3: User}
      */

@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 final class CreateStockingInspection
 {
     /**
-     * @param  Collection<int|string, array{quantity: int}>  $items
+     * @param  Collection<int|string, array{quantity: int, notes?: ?string}>  $items
      *
      * @throws \RuntimeException
      */
@@ -73,6 +73,7 @@ final class CreateStockingInspection
                     'quantity_loaded'      => $qty,
                     'physical_count_before' => null,
                     'physical_count_after'  => null,
+                    'notes'                => filled($item['notes'] ?? null) ? trim((string) $item['notes']) : null,
                 ]);
             }
 
@@ -84,7 +85,7 @@ final class CreateStockingInspection
      * Valida que el vehículo tenga cada producto con al menos 1 unidad disponible.
      * No revela la cantidad exacta al conductor — solo permite o bloquea.
      *
-     * @param  Collection<int|string, array{quantity: int}>  $items
+     * @param  Collection<int|string, array{quantity: int, notes?: ?string}>  $items
      *
      * @throws \RuntimeException
      */

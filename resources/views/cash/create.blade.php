@@ -50,7 +50,7 @@
                     <select name="driver_user_id" class="form-input @error('driver_user_id') is-invalid @enderror" required>
                         <option value="">— Seleccionar conductor —</option>
                         @foreach($drivers as $driver)
-                        <option value="{{ $driver->id }}" {{ old('driver_user_id') == $driver->id ? 'selected' : '' }}>
+                        <option value="{{ $driver->id }}" {{ old('driver_user_id', $defaultDriverId ?? null) == $driver->id ? 'selected' : '' }}>
                             {{ $driver->name }}
                         </option>
                         @endforeach
@@ -63,7 +63,7 @@
                     <select name="route_id" class="form-input @error('route_id') is-invalid @enderror" required>
                         <option value="">— Seleccionar ruta —</option>
                         @foreach($routes as $route)
-                        <option value="{{ $route->id }}" {{ old('route_id') == $route->id ? 'selected' : '' }}>
+                        <option value="{{ $route->id }}" {{ old('route_id', $defaultRouteId ?? null) == $route->id ? 'selected' : '' }}>
                             {{ $route->name }}
                         </option>
                         @endforeach

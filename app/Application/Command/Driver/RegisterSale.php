@@ -20,7 +20,7 @@ final class RegisterSale
     /**
      * Registra una venta desde una máquina.
      *
-     * @param  Collection<int|string, array{quantity: int, unit_price: float}>  $items
+     * @param  Collection<int|string, array{quantity: int, unit_price: float, notes?: ?string}>  $items
      *
      * @throws \RuntimeException si no hay stock suficiente en la máquina
      */
@@ -57,6 +57,7 @@ final class RegisterSale
                     'product_id' => (int) $productId,
                     'quantity_sold' => $qty,
                     'unit_price' => $unitPrice,
+                    'notes' => filled($item['notes'] ?? null) ? trim((string) $item['notes']) : null,
                 ]);
 
                 $stock = Stock::firstOrNew(['warehouse_id' => $machineWarehouse->id, 'product_id' => (int) $productId]);
@@ -80,7 +81,7 @@ final class RegisterSale
     }
 
     /**
-     * @param  Collection<int|string, array{quantity: int, unit_price: float}>  $items
+     * @param  Collection<int|string, array{quantity: int, unit_price: float, notes?: ?string}>  $items
      *
      * @throws \RuntimeException
      */

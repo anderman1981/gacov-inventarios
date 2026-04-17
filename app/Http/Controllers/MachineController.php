@@ -12,11 +12,14 @@ use App\Http\Requests\BulkCatalogImportRequest;
 use App\Http\Requests\MachineRequest;
 use App\Models\ExcelImport;
 use App\Models\Machine;
+use App\Models\MachineSale;
 use App\Models\Route;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
 use App\Support\SearchHelper;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
@@ -123,6 +126,7 @@ final class MachineController extends Controller
         abort_unless(auth()->user()?->can('machines.view'), 403);
 
         $query = Machine::with(['route', 'operator']);
+        $perPage = max(10, min(100, (int) $request->integer('per_page', 20)));
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -139,7 +143,7 @@ final class MachineController extends Controller
             $query->where('is_active', (bool) $request->input('is_active'));
         }
 
-        $machines = $query->orderBy('name')->paginate(20)->withQueryString();
+        $machines = $query->orderBy('name')->paginate($perPage)->withQueryString();
 
         // Cargar stock total de cada máquina desde su bodega tipo 'maquina'
         $machineIds = $machines->pluck('id')->toArray();
@@ -155,15 +159,19 @@ final class MachineController extends Controller
 
         $routes = Route::where('is_active', true)->orderBy('name')->get();
 
-        return view('machines.index', compact('machines', 'routes', 'stockTotals'));
+        return view('machines.index', compact('machines', 'routes', 'stockTotals', 'perPage'));
     }
 
-    public function show(string $machine): View
+    public function show(Request $request, string $machine): View
     {
         abort_unless(auth()->user()?->can('machines.view'), 403);
 
         $machine = $this->resolveMachineOrFail($machine);
         $machine->load(['route', 'operator']);
+        $stockSearch = trim((string) $request->input('stock_search', ''));
+        $stockFilter = (string) $request->input('stock_filter', 'all');
+        $perPage = max(10, min(100, (int) $request->integer('per_page', 10)));
+        $perPageOptions = [10, 20, 50, 100];
 
         // Bodega tipo 'maquina' de esta máquina
         $warehouse = Warehouse::where('machine_id', $machine->id)
@@ -174,6 +182,55 @@ final class MachineController extends Controller
         $stockItems = $warehouse
             ? $warehouse->stocks()->with('product')->get()
             : collect();
+
+        $stockItems = $stockItems->map(function ($item) {
+            $quantity = (float) $item->quantity;
+            $item->stock_state_label = match (true) {
+                $quantity <= 0 => 'Sin stock',
+                $quantity <= 5 => 'Stock bajo',
+                default => 'Disponible',
+            };
+            $item->stock_state_class = match (true) {
+                $quantity <= 0 => 'badge-error',
+                $quantity <= 5 => 'badge-warning',
+                default => 'badge-success',
+            };
+            $item->product_name = $item->product?->name ?? 'Producto eliminado';
+            $item->product_code = $item->product?->code ?? '—';
+            $item->product_sku = $item->product?->supplier_sku;
+            $item->product_unit = $item->product?->unit_of_measure ?? '—';
+
+            return $item;
+        });
+
+        if ($stockSearch !== '') {
+            $needle = Str::lower($stockSearch);
+
+            $stockItems = $stockItems->filter(static function ($item) use ($needle): bool {
+                return Str::contains(Str::lower((string) $item->product_name), $needle)
+                    || Str::contains(Str::lower((string) $item->product_code), $needle)
+                    || Str::contains(Str::lower((string) ($item->product_sku ?? '')), $needle);
+            })->values();
+        }
+
+        $stockItems = match ($stockFilter) {
+            'with_stock' => $stockItems->filter(fn ($item): bool => (float) $item->quantity > 0)->values(),
+            'low_stock' => $stockItems->filter(fn ($item): bool => (float) $item->quantity > 0 && (float) $item->quantity <= 5)->values(),
+            'empty' => $stockItems->filter(fn ($item): bool => (float) $item->quantity <= 0)->values(),
+            default => $stockItems->values(),
+        };
+
+        $stockSummaryTotal = (int) $stockItems->sum('quantity');
+        $stockVisibleItems = (int) $stockItems->count();
+        $stockCurrentPage = LengthAwarePaginator::resolveCurrentPage('stock_page');
+        $stockItems = new LengthAwarePaginator(
+            $stockItems->forPage($stockCurrentPage, $perPage)->values(),
+            $stockItems->count(),
+            $perPage,
+            $stockCurrentPage,
+            ['path' => $request->url(), 'pageName' => 'stock_page']
+        );
+        $stockItems->appends($request->except('stock_page'));
 
         // Últimos 5 surtidos
         $recentStockings = $machine->stockings()
@@ -197,7 +254,19 @@ final class MachineController extends Controller
                 $sale->total_units = (int) ($sale->total_units ?? 0);
             });
 
-        return view('machines.show', compact('machine', 'warehouse', 'stockItems', 'recentStockings', 'recentSales'));
+        return view('machines.show', compact(
+            'machine',
+            'warehouse',
+            'stockItems',
+            'stockSummaryTotal',
+            'stockVisibleItems',
+            'stockSearch',
+            'stockFilter',
+            'perPage',
+            'perPageOptions',
+            'recentStockings',
+            'recentSales'
+        ));
     }
 
     public function create(): View

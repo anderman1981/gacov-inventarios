@@ -21,6 +21,7 @@ use App\Models\Warehouse;
 use App\Support\Routes\RouteScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
@@ -87,6 +88,10 @@ final class DriverController extends Controller
 
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
+        $productSearch = mb_strtolower(trim((string) $request->string('product_search', '')));
+        $stockFilter = $request->string('stock_filter', 'all')->toString();
+        $perPage = max(10, min(100, $request->integer('per_page', 10)));
+        $perPageOptions = [10, 20, 50, 100];
 
         $machines = Machine::where('route_id', $route?->id)
             ->where('is_active', true)
@@ -110,7 +115,47 @@ final class DriverController extends Controller
                 return $product;
             });
 
-        return view('driver.stocking.create', compact('machines', 'products', 'vehicleWarehouse', 'route', 'availableRoutes'));
+        $products = $products->filter(function (Product $product) use ($productSearch, $stockFilter): bool {
+            $productName = mb_strtolower(trim((string) $product->name));
+            $productCode = mb_strtolower(trim((string) $product->code));
+            $productCategory = mb_strtolower(trim((string) ($product->category ?? '')));
+
+            $matchesSearch = $productSearch === ''
+                || str_contains($productName, $productSearch)
+                || str_contains($productCode, $productSearch)
+                || str_contains($productCategory, $productSearch);
+
+            $matchesStock = match ($stockFilter) {
+                'with_stock' => $product->vehicle_stock > 0,
+                'low_stock' => $product->vehicle_stock > 0 && $product->vehicle_stock <= 5,
+                'empty' => $product->vehicle_stock <= 0,
+                default => true,
+            };
+
+            return $matchesSearch && $matchesStock;
+        })->values();
+
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $products = new LengthAwarePaginator(
+            $products->forPage($currentPage, $perPage)->values(),
+            $products->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url()]
+        );
+        $products->appends($request->except('page'));
+
+        return view('driver.stocking.create', compact(
+            'machines',
+            'products',
+            'vehicleWarehouse',
+            'route',
+            'availableRoutes',
+            'productSearch',
+            'stockFilter',
+            'perPage',
+            'perPageOptions',
+        ));
     }
 
     public function storeStocking(StoreStockingRequest $request): RedirectResponse
@@ -267,15 +312,88 @@ final class DriverController extends Controller
 
         $route = $this->resolveActiveRoute($request);
         $availableRoutes = $this->availableRoutes();
+        $selectedMachineId = $request->integer('machine_id');
+        $stockFilter = $request->string('stock_filter', 'all')->toString();
+        $perPage = max(10, min(100, $request->integer('per_page', 10)));
+        $perPageOptions = [10, 20, 50, 100];
 
-        $machines = Machine::where('route_id', $route?->id)
-            ->where('is_active', true)
+        $machines = collect();
+        $selectedMachine = null;
+        $machineStockByProductId = collect();
+        $selectedMachineStockTotal = 0;
+        $selectedMachineAvailableSkus = 0;
+
+        if ($route instanceof Route) {
+            $machines = Machine::with(['warehouse.stocks'])
+                ->where('route_id', $route->id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            $selectedMachine = $machines->firstWhere('id', $selectedMachineId)
+                ?? ($machines->count() === 1 ? $machines->first() : null);
+
+            if ($selectedMachine?->warehouse?->stocks) {
+                $machineStockByProductId = $selectedMachine->warehouse->stocks
+                    ->pluck('quantity', 'product_id')
+                    ->map(fn ($quantity): int => (int) $quantity);
+                $selectedMachineStockTotal = (int) $machineStockByProductId->sum();
+                $selectedMachineAvailableSkus = (int) $machineStockByProductId
+                    ->filter(static fn (int $quantity): bool => $quantity > 0)
+                    ->count();
+            }
+        }
+
+        $products = Product::where('is_active', true)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function (Product $product) use ($machineStockByProductId): Product {
+                $machineStock = (int) ($machineStockByProductId->get($product->id, 0));
+                $product->machine_stock = $machineStock;
+                $product->machine_stock_label = match (true) {
+                    $machineStock <= 0 => 'Sin stock',
+                    $machineStock <= 5 => 'Stock bajo',
+                    default => 'Disponible',
+                };
+                $product->machine_stock_class = match (true) {
+                    $machineStock <= 0 => 'sale-state-pill--empty',
+                    $machineStock <= 5 => 'sale-state-pill--low',
+                    default => 'sale-state-pill--ok',
+                };
+                $product->category_initials = $this->categoryInitials((string) $product->category);
 
-        $products = Product::where('is_active', true)->orderBy('name')->get();
+                return $product;
+            });
 
-        return view('driver.sales.create', compact('machines', 'products', 'route', 'availableRoutes'));
+        $products = match ($stockFilter) {
+            'with_stock' => $products->filter(fn (Product $product): bool => $product->machine_stock > 0)->values(),
+            'low_stock' => $products->filter(fn (Product $product): bool => $product->machine_stock > 0 && $product->machine_stock <= 5)->values(),
+            'empty' => $products->filter(fn (Product $product): bool => $product->machine_stock <= 0)->values(),
+            default => $products->values(),
+        };
+
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $products = new LengthAwarePaginator(
+            $products->forPage($currentPage, $perPage)->values(),
+            $products->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url()]
+        );
+        $products->appends($request->except('page'));
+
+        return view('driver.sales.create', compact(
+            'machines',
+            'products',
+            'route',
+            'availableRoutes',
+            'selectedMachine',
+            'selectedMachineStockTotal',
+            'selectedMachineAvailableSkus',
+            'stockFilter',
+            'perPage',
+            'perPageOptions',
+        ));
     }
 
     public function storeSale(StoreSaleRequest $request): RedirectResponse
@@ -408,5 +526,19 @@ final class DriverController extends Controller
     private function canManageAnyRoute(User $user): bool
     {
         return $this->routeScheduleService->canManageAnyRoute($user);
+    }
+
+    private function categoryInitials(string $category): string
+    {
+        $segments = array_filter(explode('_', trim($category)));
+
+        if ($segments === []) {
+            return 'NA';
+        }
+
+        return strtoupper(implode('', array_map(
+            static fn (string $segment): string => mb_substr($segment, 0, 1),
+            $segments
+        )));
     }
 }
