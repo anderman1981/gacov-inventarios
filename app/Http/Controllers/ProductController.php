@@ -31,6 +31,8 @@ final class ProductController extends Controller
                 $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
                     ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%")
                     ->orWhere('worldoffice_code', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('supplier', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('supplier_sku', 'like', "%" . SearchHelper::escapeLike($search) . "%")
                     ->orWhere('id', 'like', "%" . SearchHelper::escapeLike($search) . "%");
             });
         }

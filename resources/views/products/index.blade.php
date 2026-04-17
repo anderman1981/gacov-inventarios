@@ -46,7 +46,7 @@
         <div>
             <div class="inventory-filter-card__title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 Filtrar catálogo
-                <button type="button" class="amr-icon-button amr-tooltip-trigger" data-tooltip="Busca por ID, código, WorldOffice, nombre o categoría" aria-label="Ayuda del filtro">
+                <button type="button" class="amr-icon-button amr-tooltip-trigger inventory-help-pulse" data-tooltip="Busca por ID, código, WorldOffice, nombre o categoría" aria-label="Ayuda del filtro">
                     <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
                 </button>
             </div>
@@ -97,53 +97,53 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Código</th>
-                <th>WO</th>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th>Unidad</th>
-                <th style="text-align:right">Alerta mín.</th>
-                <th>Estado</th>
+                <th class="col-id">ID</th>
+                <th class="col-code">COD</th>
+                <th class="col-wo">WO</th>
+                <th class="col-product">Producto</th>
+                <th class="col-category">CAT</th>
+                <th class="col-unit">Unidad</th>
+                <th class="col-min-stock" style="text-align:right">Alerta mín.</th>
+                <th class="col-status">Estado</th>
                 @canany(['products.edit', 'products.delete'])
-                <th>Acciones</th>
+                <th class="col-actions">Acciones</th>
                 @endcanany
             </tr>
         </thead>
         <tbody>
             @foreach($products as $product)
             <tr>
-                <td><strong>#{{ $product->id }}</strong></td>
-                <td><code style="font-size:12px;color:var(--gacov-primary)">{{ $product->code }}</code></td>
-                <td>{{ $product->worldoffice_code ?: '—' }}</td>
-                <td>
+                <td class="col-id"><strong>#{{ $product->id }}</strong></td>
+                <td class="col-code"><code style="font-size:12px;color:var(--gacov-primary)">{{ $product->code }}</code></td>
+                <td class="col-wo">{{ $product->worldoffice_code ?: '—' }}</td>
+                <td class="col-product">
                     <div class="inventory-table-product">
                         <span class="inventory-table-product__name">{{ $product->name }}</span>
                         <span class="inventory-table-product__meta">{{ $product->unit_of_measure }}</span>
                     </div>
                 </td>
-                <td>
+                <td class="col-category">
                     @php
                     $catBadge = match($product->category) {
-                        'snack'            => ['badge-info', 'Snacks'],
-                        'bebida_fria'      => ['badge-neutral', 'Bebidas frías'],
-                        'bebida_caliente'  => ['badge-warning', 'Bebidas calientes'],
-                        'insumo'           => ['badge-warning', 'Insumos'],
-                        default            => ['badge-neutral', $product->category],
+                        'snack'            => ['badge-info', 'SN', 'Snacks'],
+                        'bebida_fria'      => ['badge-neutral', 'BF', 'Bebidas frías'],
+                        'bebida_caliente'  => ['badge-warning', 'BC', 'Bebidas calientes'],
+                        'insumo'           => ['badge-warning', 'IN', 'Insumos'],
+                        default            => ['badge-neutral', strtoupper(mb_substr((string) $product->category, 0, 2)), (string) $product->category],
                     };
                     @endphp
-                    <span class="badge {{ $catBadge[0] }}">{{ $catBadge[1] }}</span>
+                    <span class="badge {{ $catBadge[0] }} inventory-category-badge" title="{{ $catBadge[2] }}">{{ $catBadge[1] }}</span>
                 </td>
-                <td>{{ $product->unit_of_measure }}</td>
-                <td style="text-align:right">{{ number_format((float) $product->min_stock_alert, 0, ',', '.') }}</td>
-                <td>
-                    <span class="badge {{ $product->is_active ? 'badge-success' : 'badge-neutral' }}">
+                <td class="col-unit">{{ $product->unit_of_measure }}</td>
+                <td class="col-min-stock" style="text-align:right">{{ number_format((float) $product->min_stock_alert, 0, ',', '.') }}</td>
+                <td class="col-status">
+                    <span class="badge {{ $product->is_active ? 'badge-success' : 'badge-neutral' }} inventory-status-pill">
                         {{ $product->is_active ? 'Activo' : 'Inactivo' }}
                     </span>
                 </td>
                 @canany(['products.edit', 'products.delete'])
-                <td>
-                    <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
+                <td class="col-actions">
+                    <div class="inventory-row-actions">
                         @can('products.edit')
                         <a href="{{ route('products.edit', $product) }}" class="amr-icon-button amr-icon-button--primary amr-tooltip-trigger" data-tooltip="Editar producto" aria-label="Editar producto">
                             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3a2 2 0 012.828 0l.586.586a2 2 0 010 2.828l-8.293 8.293a1 1 0 01-.465.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.465L13.586 3zM12 5.414L7.5 9.914 7.086 11.5l1.586-.414L13.172 6l-1.172-1.172z"/></svg>

@@ -36,8 +36,14 @@ final class ProductRequest extends FormRequest
             'worldoffice_code' => ['nullable', 'string', 'max:20'],
             'category' => ['required', Rule::in(['bebida_fria', 'bebida_caliente', 'snack', 'insumo', 'otro'])],
             'unit_of_measure' => ['required', Rule::in(['Und.', 'Kg', 'Lt', 'Caja', 'Paquete', 'Bolsa'])],
+            'cost' => ['nullable', 'numeric', 'min:0'],
+            'min_sale_price' => ['nullable', 'numeric', 'min:0'],
             'unit_price' => ['required', 'numeric', 'min:0'],
             'min_stock_alert' => ['nullable', 'numeric', 'min:0'],
+            'supplier' => ['nullable', 'string', 'max:150'],
+            'supplier_sku' => ['nullable', 'string', 'max:60'],
+            'expiration_date' => ['nullable', 'date'],
+            'purchase_date' => ['nullable', 'date'],
             'is_active' => ['boolean'],
         ];
     }
@@ -58,11 +64,19 @@ final class ProductRequest extends FormRequest
             'category.in' => 'La categoría seleccionada no es válida.',
             'unit_of_measure.required' => 'Debe seleccionar una unidad de medida.',
             'unit_of_measure.in' => 'La unidad seleccionada no es válida.',
+            'cost.numeric' => 'El costo debe ser un número.',
+            'cost.min' => 'El costo no puede ser negativo.',
+            'min_sale_price.numeric' => 'El precio de venta mínimo debe ser un número.',
+            'min_sale_price.min' => 'El precio de venta mínimo no puede ser negativo.',
             'unit_price.required' => 'El precio de venta es obligatorio.',
             'unit_price.numeric' => 'El precio de venta debe ser un número.',
             'unit_price.min' => 'El precio de venta no puede ser negativo.',
             'min_stock_alert.numeric' => 'La alerta mínima debe ser un número.',
             'min_stock_alert.min' => 'La alerta mínima no puede ser negativa.',
+            'supplier.max' => 'El proveedor no puede superar los 150 caracteres.',
+            'supplier_sku.max' => 'El SKU del proveedor no puede superar los 60 caracteres.',
+            'expiration_date.date' => 'La fecha de vencimiento no es válida.',
+            'purchase_date.date' => 'La fecha de compra no es válida.',
         ];
     }
 

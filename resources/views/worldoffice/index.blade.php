@@ -10,11 +10,12 @@
                 <span class="inventory-hero__eyebrow">WorldOffice</span>
                 <h1 class="inventory-hero__title">Descargas de exportación</h1>
                 <p class="inventory-hero__subtitle">
-                    Genera los formatos de carga y descarga para bodega principal, vehículos / rutas y máquinas.
+                    Genera archivos separados de entrada y salida para bodega principal, vehículos / rutas y máquinas.
+                    Cada archivo toma los movimientos reales de stock para evitar mezclar lo que entra con lo que sale.
                     El acceso está habilitado para admin, manager y contador, y bloqueado para conductor.
                 </p>
                 <div class="inventory-hero__badges">
-                    <span class="badge badge-info">6 formatos disponibles</span>
+                    <span class="badge badge-info">6 archivos separados</span>
                     <span class="badge badge-neutral">WorldOffice contable</span>
                     <span class="badge badge-success">Formato estándar</span>
                 </div>
@@ -26,7 +27,7 @@
         <article class="worldoffice-card">
             <div class="worldoffice-card__eyebrow">Bodega principal</div>
             <h2 class="worldoffice-card__title">Formato de carga y descarga</h2>
-            <p class="worldoffice-card__copy">Exporta el inventario central con stock actual y columnas listas para registrar entrada o salida.</p>
+            <p class="worldoffice-card__copy">Exporta por separado las entradas a bodega y las salidas hacia otras bodegas.</p>
             <div class="worldoffice-card__actions">
                 <a href="{{ route('worldoffice.download', ['category' => 'bodega', 'direction' => 'load']) }}" class="btn btn-primary btn-sm">Descargar carga</a>
                 <a href="{{ route('worldoffice.download', ['category' => 'bodega', 'direction' => 'unload']) }}" class="btn btn-secondary btn-sm">Descargar descarga</a>
@@ -36,7 +37,7 @@
         <article class="worldoffice-card">
             <div class="worldoffice-card__eyebrow">Vehículos / rutas</div>
             <h2 class="worldoffice-card__title">Formato de carga y descarga</h2>
-            <p class="worldoffice-card__copy">Lista las rutas activas con su vehículo y los productos que deben cargarse o descargarse.</p>
+            <p class="worldoffice-card__copy">Separa lo que entra al vehículo desde bodega y lo que sale del vehículo hacia máquina.</p>
             <div class="worldoffice-card__actions">
                 <a href="{{ route('worldoffice.download', ['category' => 'routes', 'direction' => 'load']) }}" class="btn btn-primary btn-sm">Descargar carga</a>
                 <a href="{{ route('worldoffice.download', ['category' => 'routes', 'direction' => 'unload']) }}" class="btn btn-secondary btn-sm">Descargar descarga</a>
@@ -46,7 +47,7 @@
         <article class="worldoffice-card">
             <div class="worldoffice-card__eyebrow">Máquinas</div>
             <h2 class="worldoffice-card__title">Formato de carga y descarga</h2>
-            <p class="worldoffice-card__copy">Consolida todas las máquinas en un único archivo con el detalle de stock por producto.</p>
+            <p class="worldoffice-card__copy">Consolida todas las máquinas y separa el surtido de la venta para WordOffice.</p>
             <div class="worldoffice-card__actions">
                 <a href="{{ route('worldoffice.download', ['category' => 'machines', 'direction' => 'load']) }}" class="btn btn-primary btn-sm">Descargar carga</a>
                 <a href="{{ route('worldoffice.download', ['category' => 'machines', 'direction' => 'unload']) }}" class="btn btn-secondary btn-sm">Descargar descarga</a>

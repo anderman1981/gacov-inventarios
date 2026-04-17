@@ -101,8 +101,14 @@ final class ProductApiTest extends TestCase
             'name' => 'New Product',
             'category' => 'bebida_fria',
             'unit_of_measure' => 'Und.',
+            'cost' => 900,
+            'min_sale_price' => 1200,
             'unit_price' => 1500,
             'min_stock_alert' => 10,
+            'supplier' => 'Distribuidora del Centro S.A.S.',
+            'supplier_sku' => 'SUP-12345',
+            'purchase_date' => '2026-04-16',
+            'expiration_date' => '2026-10-16',
         ];
 
         $response = $this->actingAs($this->adminUser)
@@ -123,7 +129,13 @@ final class ProductApiTest extends TestCase
             'name' => 'New Name',
             'category' => $product->category,
             'unit_of_measure' => $product->unit_of_measure,
+            'cost' => 950,
+            'min_sale_price' => 1300,
             'unit_price' => $product->unit_price,
+            'supplier' => 'Nuevo Proveedor S.A.S.',
+            'supplier_sku' => 'SUP-999',
+            'purchase_date' => '2026-04-16',
+            'expiration_date' => '2026-12-31',
         ];
 
         $response = $this->actingAs($this->adminUser)

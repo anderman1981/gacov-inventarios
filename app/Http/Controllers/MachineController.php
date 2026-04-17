@@ -12,6 +12,7 @@ use App\Http\Requests\BulkCatalogImportRequest;
 use App\Http\Requests\MachineRequest;
 use App\Models\ExcelImport;
 use App\Models\Machine;
+use App\Models\MachineSale;
 use App\Models\Route;
 use App\Models\User;
 use App\Models\Warehouse;

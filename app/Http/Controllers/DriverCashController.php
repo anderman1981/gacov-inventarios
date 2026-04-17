@@ -18,11 +18,21 @@ use Illuminate\View\View;
  */
 final class DriverCashController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         abort_unless(auth()->user()?->can('cash.manage'), 403);
 
-        $routeFilter = $request->integer('route_id') ?: null;
+        $defaultRouteId = $request->user()?->route_id;
+
+        if (! $request->filled('route_id') && $defaultRouteId) {
+            return redirect()->route('cash.index', array_merge($request->query(), [
+                'route_id' => $defaultRouteId,
+            ]));
+        }
+
+        $routeFilter = $request->filled('route_id')
+            ? $request->integer('route_id')
+            : $defaultRouteId;
         $driverFilter = $request->integer('driver_id') ?: null;
         $dateFrom = $request->input('date_from', now()->startOfMonth()->toDateString());
         $dateTo   = $request->input('date_to', now()->toDateString());
@@ -47,8 +57,10 @@ final class DriverCashController extends Controller
 
         $routes  = Route::where('is_active', true)->orderBy('name')->get();
         $drivers = User::role('conductor')->where('is_active', true)->orderBy('name')->get();
+        $defaultRouteId = $request->user()?->route_id;
+        $defaultDriverId = $defaultRouteId ? Route::query()->whereKey($defaultRouteId)->value('driver_user_id') : null;
 
-        return view('cash.create', compact('routes', 'drivers'));
+        return view('cash.create', compact('routes', 'drivers', 'defaultRouteId', 'defaultDriverId'));
     }
 
     public function store(Request $request): RedirectResponse

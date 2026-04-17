@@ -6,6 +6,7 @@ namespace Tests\Feature\Products;
 
 use App\Models\Product;
 use App\Models\Stock;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use Tests\TestCase;
@@ -115,6 +116,31 @@ final class ProductCrudTest extends TestCase
         $response->assertViewIs('products.create');
     }
 
+    public function test_user_with_permission_can_open_edit_form_for_tenant_product(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $user = User::factory()->create([
+            'tenant_id' => $tenant->id,
+        ]);
+        $user->givePermissionTo('products.view');
+        $user->givePermissionTo('products.edit');
+
+        $product = Product::factory()->create([
+            'tenant_id' => $tenant->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withoutMiddleware([
+                \App\Http\Middleware\EnsureTenantContext::class,
+                \App\Http\Middleware\RequireModuleAccess::class,
+            ])
+            ->get(route('products.edit', $product));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('products.edit');
+        $response->assertViewHas('product', fn (Product $viewProduct): bool => $viewProduct->is($product));
+    }
+
     public function test_user_without_permission_cannot_see_create_form(): void
     {
         $user = User::factory()->create();
@@ -133,8 +159,14 @@ final class ProductCrudTest extends TestCase
             'name' => 'Producto de Prueba',
             'category' => 'snack',
             'unit_of_measure' => 'Und.',
+            'cost' => 900.00,
+            'min_sale_price' => 1200.00,
             'unit_price' => 1500.00,
             'min_stock_alert' => 10,
+            'supplier' => 'Distribuidora del Centro S.A.S.',
+            'supplier_sku' => 'SUP-12345',
+            'purchase_date' => '2026-04-16',
+            'expiration_date' => '2026-10-16',
         ];
 
         $response = $this->actingAs($this->adminUser)
@@ -146,6 +178,7 @@ final class ProductCrudTest extends TestCase
         $this->assertDatabaseHas('products', [
             'code' => 'TEST001',
             'name' => 'Producto de Prueba',
+            'supplier_sku' => 'SUP-12345',
         ]);
     }
 
@@ -192,8 +225,14 @@ final class ProductCrudTest extends TestCase
                 'name' => 'Nombre Actualizado',
                 'category' => $product->category,
                 'unit_of_measure' => $product->unit_of_measure,
+                'cost' => 950.00,
+                'min_sale_price' => 1300.00,
                 'unit_price' => $product->unit_price,
                 'min_stock_alert' => $product->min_stock_alert,
+                'supplier' => 'Nuevo Proveedor S.A.S.',
+                'supplier_sku' => 'SUP-999',
+                'purchase_date' => '2026-04-16',
+                'expiration_date' => '2026-12-31',
             ]);
 
         $response->assertRedirect();
@@ -202,6 +241,7 @@ final class ProductCrudTest extends TestCase
         $this->assertDatabaseHas('products', [
             'id' => $product->id,
             'name' => 'Nombre Actualizado',
+            'supplier' => 'Nuevo Proveedor S.A.S.',
         ]);
     }
 

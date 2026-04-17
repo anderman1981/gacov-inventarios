@@ -54,6 +54,18 @@
                     @error('unit_of_measure')<span class="form-error">{{ $message }}</span>@enderror
                 </div>
                 <div class="form-group">
+                    <label class="form-label">Costo (COP)</label>
+                    <input type="number" name="cost" class="form-input {{ $errors->has('cost') ? 'is-invalid' : '' }}"
+                           value="{{ old('cost', 0) }}" min="0" step="50">
+                    @error('cost')<span class="form-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Precio de venta mínimo (COP)</label>
+                    <input type="number" name="min_sale_price" class="form-input {{ $errors->has('min_sale_price') ? 'is-invalid' : '' }}"
+                           value="{{ old('min_sale_price', 0) }}" min="0" step="50">
+                    @error('min_sale_price')<span class="form-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="form-group">
                     <label class="form-label">Precio de venta (COP) <span style="color:var(--gacov-error)">*</span></label>
                     <input type="number" name="unit_price" class="form-input {{ $errors->has('unit_price') ? 'is-invalid' : '' }}"
                            value="{{ old('unit_price') }}" min="0" step="50" required>
@@ -65,12 +77,45 @@
                            value="{{ old('min_stock_alert', 0) }}" min="0" step="1">
                     @error('min_stock_alert')<span class="form-error">{{ $message }}</span>@enderror
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Proveedor</label>
+                    <input type="text" name="supplier" class="form-input {{ $errors->has('supplier') ? 'is-invalid' : '' }}"
+                           value="{{ old('supplier') }}" placeholder="Ej: Distribuidora X">
+                    @error('supplier')<span class="form-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="form-group">
+                    <label class="form-label">SKU / Proveedor</label>
+                    <input type="text" name="supplier_sku" class="form-input {{ $errors->has('supplier_sku') ? 'is-invalid' : '' }}"
+                           value="{{ old('supplier_sku') }}" placeholder="Código del proveedor">
+                    @error('supplier_sku')<span class="form-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fecha de compra</label>
+                    <input type="date" name="purchase_date" class="form-input {{ $errors->has('purchase_date') ? 'is-invalid' : '' }}"
+                           value="{{ old('purchase_date') }}">
+                    @error('purchase_date')<span class="form-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fecha de vencimiento</label>
+                    <input type="date" name="expiration_date" class="form-input {{ $errors->has('expiration_date') ? 'is-invalid' : '' }}"
+                           value="{{ old('expiration_date') }}">
+                    @error('expiration_date')<span class="form-error">{{ $message }}</span>@enderror
+                </div>
                 <div class="form-group" style="display:flex;align-items:center;gap:var(--space-3);padding-top:var(--space-6)">
                     <input type="hidden" name="is_active" value="0">
                     <input type="checkbox" name="is_active" id="is_active" value="1"
                            {{ old('is_active', '1') === '1' ? 'checked' : '' }}
                            style="width:18px;height:18px;accent-color:var(--gacov-primary)">
                     <label for="is_active" class="form-label" style="margin-bottom:0;cursor:pointer">Producto activo</label>
+                </div>
+            </div>
+            <div class="panel" style="margin-top:var(--space-5);padding:var(--space-4);background:var(--gacov-bg-elevated)">
+                <div class="panel-header" style="margin:0 0 var(--space-3) 0">
+                    <span class="panel-title">Metadatos</span>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label class="form-label">Fecha de creación</label>
+                    <input type="text" class="form-input" value="Se registra automáticamente al guardar el producto" disabled>
                 </div>
             </div>
             <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6);padding-top:var(--space-6);border-top:1px solid var(--gacov-border)">

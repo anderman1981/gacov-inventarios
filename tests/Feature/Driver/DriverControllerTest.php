@@ -8,6 +8,7 @@ use App\Domain\Tenant\Services\TenantContext;
 use App\Models\AppModule;
 use App\Models\Machine;
 use App\Models\MachineStockingRecord;
+use App\Models\MachineSaleItem;
 use App\Models\Product;
 use App\Models\Route;
 use App\Models\RouteScheduleAssignment;
@@ -349,6 +350,61 @@ final class DriverControllerTest extends TestCase
         $response->assertViewIs('driver.sales.create');
     }
 
+    public function test_sales_form_shows_machine_inventory_and_editable_pricing(): void
+    {
+        $product = Product::factory()->create([
+            'code' => 'AGUA600',
+            'name' => 'Agua 600ML',
+            'category' => 'bebida_fria',
+            'cost' => 1200,
+            'unit_price' => 3500,
+        ]);
+
+        Stock::factory()->forWarehouse($this->machineWarehouse)->forProduct($product)->withQuantity(7)->create();
+
+        $response = $this->actingAs($this->driver)->get(route('driver.sales.create', [
+            'route_id' => $this->route->id,
+            'machine_id' => $this->machine->id,
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Máquina activa');
+        $response->assertSee('Stock visible');
+        $response->assertSee('Agua 600ML');
+        $response->assertSee('Observación');
+        $response->assertSee('Precio unit. (COP)');
+        $response->assertSee('7');
+        $response->assertSee('$1.200');
+        $response->assertSee('value="3500"', false);
+    }
+
+    public function test_sales_form_can_filter_products_with_stock_only(): void
+    {
+        $inStock = Product::factory()->create([
+            'code' => 'STOCK01',
+            'name' => 'Producto con stock',
+        ]);
+        $emptyStock = Product::factory()->create([
+            'code' => 'STOCK00',
+            'name' => 'Producto sin stock',
+        ]);
+
+        Stock::factory()->forWarehouse($this->machineWarehouse)->forProduct($inStock)->withQuantity(4)->create();
+        Stock::factory()->forWarehouse($this->machineWarehouse)->forProduct($emptyStock)->withQuantity(0)->create();
+
+        $response = $this->actingAs($this->driver)->get(route('driver.sales.create', [
+            'route_id' => $this->route->id,
+            'machine_id' => $this->machine->id,
+            'stock_filter' => 'with_stock',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('Filtro de stock');
+        $response->assertSee('Con stock');
+        $response->assertSee('Producto con stock');
+        $response->assertDontSee('Producto sin stock');
+    }
+
     // ──────────────────────────────────────────────────────────────
     // STORE SALE — HAPPY PATH
     // ──────────────────────────────────────────────────────────────
@@ -363,11 +419,19 @@ final class DriverControllerTest extends TestCase
         $response = $this->actingAs($this->driver)->post(route('driver.sales.store'), [
             'route_id' => $this->route->id,
             'machine_id' => $this->machine->id,
-            'items' => [$product->id => ['quantity' => 2, 'unit_price' => 3500]],
+            'items' => [$product->id => [
+                'quantity' => 2,
+                'unit_price' => 3500,
+                'notes' => 'Precio ajustado por ubicación premium',
+            ]],
         ]);
 
         $response->assertRedirect(route('driver.dashboard', ['route_id' => $this->route->id]));
         $response->assertSessionHas('success');
+
+        $saleItem = MachineSaleItem::query()->latest('id')->firstOrFail();
+        $this->assertSame(3500.0, (float) $saleItem->unit_price);
+        $this->assertSame('Precio ajustado por ubicación premium', $saleItem->notes);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -396,7 +460,7 @@ final class DriverControllerTest extends TestCase
         $response = $this->actingAs($this->driver)->post(route('driver.sales.store'), [
             'route_id' => $this->route->id,
             'machine_id' => $this->machine->id,
-            'items' => [$product->id => ['quantity' => 0, 'unit_price' => 1000]],
+            'items' => [$product->id => ['quantity' => 0, 'unit_price' => 1000, 'notes' => '']],
         ]);
 
         $response->assertSessionHas('error');
@@ -412,7 +476,7 @@ final class DriverControllerTest extends TestCase
         $response = $this->actingAs($this->driver)->post(route('driver.sales.store'), [
             'route_id' => $this->route->id,
             'machine_id' => $this->machine->id,
-            'items' => [$product->id => ['quantity' => 5, 'unit_price' => 1000]],
+            'items' => [$product->id => ['quantity' => 5, 'unit_price' => 1000, 'notes' => 'Sin stock suficiente']],
         ]);
 
         $response->assertSessionHas('error');

@@ -32,7 +32,9 @@ final class ProductApiController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('supplier', 'like', "%{$search}%")
+                    ->orWhere('supplier_sku', 'like', "%{$search}%");
             });
         }
 

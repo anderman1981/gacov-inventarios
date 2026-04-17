@@ -21,6 +21,7 @@ final class StoreSaleRequest extends FormRequest
             'items' => ['required', 'array'],
             'items.*.quantity' => ['nullable', 'integer', 'min:0'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'items.*.notes' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }
