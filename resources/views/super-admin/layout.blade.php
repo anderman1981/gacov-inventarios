@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     {{-- PWA Meta Tags --}}
-    <meta name="theme-color" content="#F59E0B">
+    <meta name="theme-color" content="#D71920">
     <meta name="description" content="Panel de administración SaaS para AMR Tech">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,7 +22,11 @@
     <link rel="manifest" href="/manifest.json">
     
     <title>@yield('title', 'Panel Maestro') — AMR Tech</title>
+    @php($routeName = request()->route()?->getName() ?? '')
+    @php($hasViteAssets = file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
+    @if($hasViteAssets)
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @endif
     @livewireStyles
     @stack('styles')
     <style>
@@ -30,9 +34,9 @@
             display: inline-flex;
             align-items: center;
             gap: var(--space-1);
-            background: rgba(245,158,11,.15);
-            color: #F59E0B;
-            border: 1px solid rgba(245,158,11,.3);
+            background: rgba(215,25,32,.12);
+            color: #D71920;
+            border: 1px solid rgba(215,25,32,.24);
             border-radius: var(--radius-full);
             padding: 2px var(--space-3);
             font-size: 11px;
@@ -45,14 +49,14 @@
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #F59E0B;
+            background: #D71920;
             display: inline-block;
         }
         .amr-brand-icon {
             width: 32px;
             height: 32px;
             border-radius: var(--radius-sm);
-            background: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%);
+            background: linear-gradient(135deg, #D71920 0%, #111111 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -159,8 +163,6 @@
 
         {{-- Nav --}}
         <nav class="sidebar-nav">
-
-            @php $routeName = request()->route()?->getName() ?? ''; @endphp
 
             <a href="{{ route('super-admin.dashboard') }}"
                class="nav-item {{ $routeName === 'super-admin.dashboard' ? 'active' : '' }}">

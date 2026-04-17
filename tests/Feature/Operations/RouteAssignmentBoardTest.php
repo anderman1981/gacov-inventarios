@@ -11,6 +11,7 @@ use App\Models\RouteScheduleAssignment;
 use App\Models\Tenant;
 use App\Models\TenantBillingProfile;
 use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
@@ -24,9 +25,76 @@ final class RouteAssignmentBoardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Rutas y conductores');
+        $response->assertSee('Añadir ruta');
         $response->assertSee($driverA->name);
         $response->assertSee($driverB->name);
         $response->assertSee($routeA->code);
+        $response->assertSee('Editar');
+        $response->assertSee('Quitar');
+    }
+
+    public function test_manager_can_see_conductors_in_route_form_select(): void
+    {
+        [$manager, $driverA, $driverB] = $this->seedBoardContext();
+
+        $response = $this->actingAs($manager)->get(route('operations.routes.create'));
+
+        $response->assertOk();
+        $response->assertSee($driverA->name);
+        $response->assertSee($driverB->name);
+        $response->assertSee($driverA->email);
+        $response->assertSee($driverB->email);
+    }
+
+    public function test_manager_can_create_edit_and_remove_route_from_board(): void
+    {
+        [$manager] = $this->seedBoardContext();
+
+        $create = $this->actingAs($manager)->post(route('operations.routes.store'), [
+            'name' => 'Ruta Sur',
+            'code' => 'RT-SUR',
+            'vehicle_plate' => 'ABC123',
+            'is_active' => true,
+        ]);
+
+        $create->assertRedirect();
+
+        $route = ClientRoute::query()->where('code', 'RT-SUR')->firstOrFail();
+        $this->assertSame('Ruta Sur', $route->name);
+        $this->assertSame('ABC123', $route->vehicle_plate);
+        $this->assertTrue($route->is_active);
+
+        $this->assertDatabaseHas('warehouses', [
+            'route_id' => $route->id,
+            'type' => 'vehiculo',
+            'code' => 'VH-RT-SUR',
+            'is_active' => true,
+        ]);
+
+        $update = $this->actingAs($manager)->put(route('operations.routes.update', $route), [
+            'name' => 'Ruta Sur Nueva',
+            'code' => 'RT-SUR-2',
+            'vehicle_plate' => 'XYZ789',
+            'is_active' => true,
+        ]);
+
+        $update->assertRedirect(route('operations.routes.board'));
+
+        $this->assertSame('Ruta Sur Nueva', $route->fresh()->name);
+        $this->assertSame('RT-SUR-2', $route->fresh()->code);
+        $this->assertSame('XYZ789', $route->fresh()->vehicle_plate);
+
+        $delete = $this->actingAs($manager)->delete(route('operations.routes.destroy', $route));
+
+        $delete->assertRedirect(route('operations.routes.board'));
+        $this->assertFalse($route->fresh()->is_active);
+        $this->assertNull($route->fresh()->driver_user_id);
+
+        $this->assertDatabaseHas('warehouses', [
+            'route_id' => $route->id,
+            'type' => 'vehiculo',
+            'is_active' => false,
+        ]);
     }
 
     public function test_manager_can_swap_routes_between_conductors(): void
@@ -97,6 +165,35 @@ final class RouteAssignmentBoardTest extends TestCase
         $this->assertSame($routeA->id, $driverA->fresh()->route_id);
 
         Carbon::setTestNow();
+    }
+
+    public function test_manager_cannot_see_or_target_conductors_from_other_tenant(): void
+    {
+        [$manager, $driverA, $driverB, $routeA] = $this->seedBoardContext();
+
+        $foreignTenant = Tenant::factory()->create();
+        $foreignDriver = User::factory()->create([
+            'tenant_id' => $foreignTenant->id,
+            'email' => 'foreign-driver@example.com',
+            'must_change_password' => false,
+        ]);
+        $foreignDriver->syncRoles(['conductor']);
+
+        $this->actingAs($manager)
+            ->get(route('operations.routes.board'))
+            ->assertOk()
+            ->assertDontSee($foreignDriver->name);
+
+        $this->actingAs($manager)
+            ->post(route('operations.routes.reassign'), [
+                'route_id' => $routeA->id,
+                'target_driver_id' => $foreignDriver->id,
+            ])
+            ->assertSessionHasErrors('target_driver_id');
+
+        $this->assertSame($driverA->id, $routeA->fresh()->driver_user_id);
+        $this->assertSame($routeA->id, $driverA->fresh()->route_id);
+        $this->assertSame($foreignTenant->id, $foreignDriver->fresh()->tenant_id);
     }
 
     /**

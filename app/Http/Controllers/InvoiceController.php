@@ -8,6 +8,7 @@ use App\Domain\Tenant\Services\TenantContext;
 use App\Http\Requests\InvoiceStoreRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
+use App\Models\Tenant;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,9 @@ final class InvoiceController extends Controller
      */
     public function index(Request $request): View
     {
-        $tenant = $this->tenantContext->getTenant();
+        abort_unless($request->user()?->can('invoices.view'), 403);
+
+        $tenant = $this->currentTenant();
 
         $query = Invoice::query()
             ->forTenant($tenant)
@@ -83,7 +86,9 @@ final class InvoiceController extends Controller
      */
     public function create(): View
     {
-        $tenant = $this->tenantContext->getTenant();
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
+        $tenant = $this->currentTenant();
         $billingProfile = $tenant->billingProfile;
 
         // Datos del emisor (empresa GACOV)
@@ -109,7 +114,9 @@ final class InvoiceController extends Controller
      */
     public function store(InvoiceStoreRequest $request): RedirectResponse
     {
-        $tenant = $this->tenantContext->getTenant();
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+
+        $tenant = $this->currentTenant();
         $user = $request->user();
 
         $data = $request->validated();
@@ -205,6 +212,9 @@ final class InvoiceController extends Controller
      */
     public function show(Invoice $invoice): View
     {
+        abort_unless(auth()->user()?->can('invoices.view'), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
         $invoice->load(['items', 'payments', 'creator']);
 
         return view('invoices.show', compact('invoice'));
@@ -215,6 +225,10 @@ final class InvoiceController extends Controller
      */
     public function edit(Invoice $invoice): View|RedirectResponse
     {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
+
         if ($invoice->status !== Invoice::STATUS_DRAFT) {
             return redirect()
                 ->route('invoices.show', $invoice)
@@ -231,6 +245,10 @@ final class InvoiceController extends Controller
      */
     public function update(InvoiceStoreRequest $request, Invoice $invoice): RedirectResponse
     {
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
+
         if ($invoice->status !== Invoice::STATUS_DRAFT) {
             return redirect()
                 ->route('invoices.show', $invoice)
@@ -306,6 +324,10 @@ final class InvoiceController extends Controller
      */
     public function issue(Invoice $invoice): RedirectResponse
     {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
+
         try {
             $invoice->issue();
 
@@ -323,6 +345,10 @@ final class InvoiceController extends Controller
      */
     public function cancel(Invoice $invoice): RedirectResponse
     {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
+
         try {
             $invoice->cancel();
 
@@ -340,6 +366,10 @@ final class InvoiceController extends Controller
      */
     public function registerPayment(Request $request, Invoice $invoice): RedirectResponse
     {
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
+
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01', 'max:'.$invoice->balance_due],
             'payment_date' => ['required', 'date'],
@@ -369,7 +399,10 @@ final class InvoiceController extends Controller
      */
     public function downloadPdf(Invoice $invoice)
     {
-        $invoice->load(['items', 'tenant', 'creator']);
+        abort_unless(auth()->user()?->can('invoices.view'), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
+        $invoice->load(['items', 'payments', 'tenant', 'creator']);
 
         // Generar PDF con DomPDF
         $pdf = Pdf::loadView('invoices.pdf', [
@@ -393,7 +426,9 @@ final class InvoiceController extends Controller
      */
     public function apiIndex(Request $request): AnonymousResourceCollection
     {
-        $tenant = $this->tenantContext->getTenant();
+        abort_unless($request->user()?->can('invoices.view'), 403);
+
+        $tenant = $this->currentTenant();
 
         $invoices = Invoice::forTenant($tenant)
             ->withCount('items')
@@ -408,8 +443,29 @@ final class InvoiceController extends Controller
      */
     public function apiShow(Invoice $invoice): InvoiceResource
     {
+        abort_unless(auth()->user()?->can('invoices.view'), 403);
+
+        $invoice = $this->tenantInvoice($invoice);
         $invoice->load(['items', 'payments', 'creator']);
 
         return new InvoiceResource($invoice);
+    }
+
+    private function currentTenant(): Tenant
+    {
+        $tenant = $this->tenantContext->getTenant();
+
+        abort_unless($tenant instanceof Tenant, 403, 'Debes operar dentro del contexto de un cliente para usar facturas.');
+
+        return $tenant;
+    }
+
+    private function tenantInvoice(Invoice $invoice): Invoice
+    {
+        $tenant = $this->currentTenant();
+
+        abort_unless($invoice->tenant_id === $tenant->id, 404);
+
+        return $invoice;
     }
 }

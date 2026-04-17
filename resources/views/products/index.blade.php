@@ -44,8 +44,13 @@
 <section class="inventory-filter-card">
     <div class="inventory-filter-card__header">
         <div>
-            <div class="inventory-filter-card__title">Filtrar catalogo</div>
-            <div class="inventory-filter-card__copy">Busca por ID, codigo, WorldOffice, nombre o categoria.</div>
+            <div class="inventory-filter-card__title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                Filtrar catálogo
+                <button type="button" class="amr-icon-button amr-tooltip-trigger" data-tooltip="Busca por ID, código, WorldOffice, nombre o categoría" aria-label="Ayuda del filtro">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+            <div class="inventory-filter-card__copy">El catálogo base se usa en bodega principal, vehículos y máquinas.</div>
         </div>
         <div class="badge badge-neutral">Resultados en esta vista: {{ number_format($products->total(), 0, ',', '.') }}</div>
     </div>
@@ -140,12 +145,22 @@
                 <td>
                     <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
                         @can('products.edit')
-                        <a href="{{ route('products.edit', $product) }}" class="inventory-action-link">Editar</a>
+                        <a href="{{ route('products.edit', $product) }}" class="amr-icon-button amr-icon-button--primary amr-tooltip-trigger" data-tooltip="Editar producto" aria-label="Editar producto">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3a2 2 0 012.828 0l.586.586a2 2 0 010 2.828l-8.293 8.293a1 1 0 01-.465.263l-3.5.875a1 1 0 01-1.213-1.213l.875-3.5a1 1 0 01.263-.465L13.586 3zM12 5.414L7.5 9.914 7.086 11.5l1.586-.414L13.172 6l-1.172-1.172z"/></svg>
+                        </a>
                         <form method="POST" action="{{ route('products.toggle', $product) }}" style="display:inline">
                             @csrf @method('PATCH')
                             <button type="submit"
-                                style="padding:7px 12px;background:{{ $product->is_active ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.12)' }};color:{{ $product->is_active ? 'var(--gacov-warning)' : 'var(--gacov-success)' }};border:none;border-radius:var(--radius-md);font-size:12px;font-weight:700;cursor:pointer">
-                                {{ $product->is_active ? 'Desactivar' : 'Reactivar' }}
+                                class="amr-icon-button amr-tooltip-trigger {{ $product->is_active ? 'amr-icon-button--warning' : 'amr-icon-button--primary' }}"
+                                data-tooltip="{{ $product->is_active ? 'Desactivar producto' : 'Reactivar producto' }}"
+                                aria-label="{{ $product->is_active ? 'Desactivar producto' : 'Reactivar producto' }}">
+                                <svg viewBox="0 0 20 20" fill="currentColor">
+                                    @if($product->is_active)
+                                    <path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm-1 4a1 1 0 112 0v4a1 1 0 11-2 0V6zm1 8a1.25 1.25 0 110-2.5A1.25 1.25 0 0110 14z"/>
+                                    @else
+                                    <path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 4a1 1 0 10-2 0v4a1 1 0 102 0V6zm-1 8a1.25 1.25 0 100-2.5A1.25 1.25 0 009 14z"/>
+                                    @endif
+                                </svg>
                             </button>
                         </form>
                         @endcan
@@ -155,8 +170,10 @@
                               onsubmit="return confirm('¿Desactivar el producto «{{ $product->name }}»?')">
                             @csrf @method('DELETE')
                             <button type="submit"
-                                style="padding:7px 12px;background:rgba(239,68,68,.1);color:var(--gacov-error);border:none;border-radius:var(--radius-md);font-size:12px;font-weight:700;cursor:pointer">
-                                Eliminar
+                                class="amr-icon-button amr-icon-button--danger amr-tooltip-trigger"
+                                data-tooltip="Eliminar producto"
+                                aria-label="Eliminar producto">
+                                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 2a2 2 0 00-2 2v1H4a1 1 0 100 2h.5l.8 9.2A2 2 0 007.3 18h5.4a2 2 0 001.99-1.8L15.5 7H16a1 1 0 100-2h-2V4a2 2 0 00-2-2H8zm2 3a1 1 0 10-2 0v1h2V5zm-2 4a1 1 0 012 0v5a1 1 0 11-2 0V9z" clip-rule="evenodd"/></svg>
                             </button>
                         </form>
                         @endif

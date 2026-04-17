@@ -8,6 +8,8 @@ Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->
     Route::middleware('module:inventory')->group(function (): void {
         Route::get('/warehouse', [InventoryController::class, 'warehouse'])->name('warehouse');
         Route::get('/vehicles', [InventoryController::class, 'vehicleStocks'])->name('vehicles');
+        Route::post('/vehicles', [InventoryController::class, 'storeVehicle'])->name('vehicles.store');
+        Route::delete('/vehicles/{route}', [InventoryController::class, 'destroyVehicle'])->name('vehicles.destroy');
         Route::get('/vehicles/import', [InventoryController::class, 'vehicleImportForm'])->name('vehicles.import.form');
         Route::get('/vehicles/import/template', [InventoryController::class, 'downloadVehicleImportTemplate'])->name('vehicles.import.template');
         Route::post('/vehicles/import', [InventoryController::class, 'storeVehicleImport'])->name('vehicles.import.store');

@@ -197,6 +197,8 @@ final class UserController extends Controller
 
     public function accessProfiles(): View
     {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
         return view('pages.acceso-por-perfil');
     }
 

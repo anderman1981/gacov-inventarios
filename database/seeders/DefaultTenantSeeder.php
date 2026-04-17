@@ -42,15 +42,16 @@ final class DefaultTenantSeeder extends Seeder
             ['key' => 'transfers',     'name' => 'Traslados',               'description' => 'Órdenes de traslado', 'phase_required' => 1, 'sort_order' => 7],
             ['key' => 'users',         'name' => 'Usuarios',                'description' => 'Administración de usuarios', 'phase_required' => 1, 'sort_order' => 8],
             ['key' => 'ocr',           'name' => 'OCR / Importación IA',    'description' => 'Lectura de planillas con IA', 'phase_required' => 1, 'sort_order' => 9],
-            ['key' => 'routes',        'name' => 'Rutas',                   'description' => 'Gestión de rutas de distribución', 'phase_required' => 2, 'sort_order' => 10],
-            ['key' => 'sales',         'name' => 'Ventas de máquinas',      'description' => 'Registro de ventas por máquina', 'phase_required' => 2, 'sort_order' => 11],
-            ['key' => 'reports',       'name' => 'Reportes',                'description' => 'Exportación PDF y Excel', 'phase_required' => 2, 'sort_order' => 12],
-            ['key' => 'analytics',     'name' => 'Analytics',               'description' => 'Gráficas y estadísticas', 'phase_required' => 3, 'sort_order' => 13],
-            ['key' => 'alerts',        'name' => 'Alertas de stock',        'description' => 'Notificaciones de stock mínimo', 'phase_required' => 3, 'sort_order' => 14],
-            ['key' => 'world_office',  'name' => 'Integración WorldOffice', 'description' => 'Exportación contable', 'phase_required' => 4, 'sort_order' => 15],
-            ['key' => 'geolocation',   'name' => 'Geolocalización',         'description' => 'Rastreo de conductores', 'phase_required' => 4, 'sort_order' => 16],
-            ['key' => 'api',           'name' => 'API REST',                'description' => 'Acceso programático externo', 'phase_required' => 4, 'sort_order' => 17],
-            ['key' => 'white_label',   'name' => 'White-label',             'description' => 'Marca propia por tenant', 'phase_required' => 5, 'sort_order' => 18],
+            ['key' => 'invoices',      'name' => 'Facturas',                'description' => 'Facturación formal y pagos del cliente', 'phase_required' => 1, 'sort_order' => 10],
+            ['key' => 'routes',        'name' => 'Rutas',                   'description' => 'Gestión de rutas de distribución', 'phase_required' => 2, 'sort_order' => 11],
+            ['key' => 'sales',         'name' => 'Ventas de máquinas',      'description' => 'Registro de ventas por máquina', 'phase_required' => 2, 'sort_order' => 12],
+            ['key' => 'reports',       'name' => 'Reportes',                'description' => 'Exportación PDF y Excel', 'phase_required' => 2, 'sort_order' => 13],
+            ['key' => 'analytics',     'name' => 'Analytics',               'description' => 'Gráficas y estadísticas', 'phase_required' => 3, 'sort_order' => 14],
+            ['key' => 'alerts',        'name' => 'Alertas de stock',        'description' => 'Notificaciones de stock mínimo', 'phase_required' => 3, 'sort_order' => 15],
+            ['key' => 'world_office',  'name' => 'Integración WorldOffice', 'description' => 'Exportación contable', 'phase_required' => 4, 'sort_order' => 16],
+            ['key' => 'geolocation',   'name' => 'Geolocalización',         'description' => 'Rastreo de conductores', 'phase_required' => 4, 'sort_order' => 17],
+            ['key' => 'api',           'name' => 'API REST',                'description' => 'Acceso programático externo', 'phase_required' => 4, 'sort_order' => 18],
+            ['key' => 'white_label',   'name' => 'White-label',             'description' => 'Marca propia por tenant', 'phase_required' => 5, 'sort_order' => 19],
         ];
 
         foreach ($modules as $moduleData) {
@@ -280,7 +281,7 @@ final class DefaultTenantSeeder extends Seeder
 
         // ── 4. ASIGNAR TENANT_ID=1 A REGISTROS EXISTENTES ─────────────────
         $tables = [
-            'products', 'machines', 'warehouses', 'routes', 'stocks',
+            'products', 'machines', 'warehouses', 'routes', 'stock',
             'stock_movements', 'transfer_orders', 'transfer_order_items',
             'machine_stocking_records', 'machine_sales',
         ];

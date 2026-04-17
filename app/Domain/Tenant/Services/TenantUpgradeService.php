@@ -25,18 +25,6 @@ final class TenantUpgradeService
     private const VALID_PHASES = [1, 2, 3, 4, 5];
 
     /**
-     * Módulos que se habilitan en cada fase
-     * phase_required => [module_keys]
-     */
-    private const PHASE_MODULES = [
-        1 => ['dashboard', 'authentication', 'drivers', 'inventory', 'products', 'machines', 'transfers', 'users', 'ocr'],
-        2 => ['routes', 'machine_sales', 'reports'],
-        3 => ['analytics', 'stock_alerts'],
-        4 => ['worldoffice_integration', 'geolocation', 'api_rest'],
-        5 => ['white_label'],
-    ];
-
-    /**
      * Ejecuta upgrade de fase para un tenant.
      */
     public function upgradePhase(Tenant $tenant, int $newPhase): array
@@ -114,8 +102,9 @@ final class TenantUpgradeService
     {
         $roadmap = [];
 
-        foreach (self::PHASE_MODULES as $phase => $modules) {
+        foreach (self::VALID_PHASES as $phase) {
             if ($phase > $fromPhase) {
+                $modules = $this->getPhaseModules($phase);
                 $roadmap[$phase] = [
                     'modules' => $modules,
                     'module_count' => count($modules),
@@ -140,7 +129,11 @@ final class TenantUpgradeService
      */
     public function getPhaseModules(int $phase): array
     {
-        return self::PHASE_MODULES[$phase] ?? [];
+        return AppModule::query()
+            ->where('phase_required', $phase)
+            ->orderBy('sort_order')
+            ->pluck('key')
+            ->all();
     }
 
     /**

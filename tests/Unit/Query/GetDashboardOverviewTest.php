@@ -40,7 +40,7 @@ final class GetDashboardOverviewTest extends TestCase
 
         $result = $this->query->handle();
 
-        $this->assertSame(7, $result['stats']['total_products']);
+        $this->assertSame(5, $result['stats']['total_products']);
     }
 
     public function test_returns_correct_total_machines_count(): void
@@ -226,6 +226,10 @@ final class GetDashboardOverviewTest extends TestCase
         $this->assertArrayHasKey('routes', $result);
         $this->assertArrayHasKey('pendingTransfers', $result);
         $this->assertArrayHasKey('monthMovements', $result);
+        $this->assertArrayHasKey('movementTrend', $result);
+        $this->assertArrayHasKey('topSoldProducts', $result);
+        $this->assertArrayHasKey('salesByLocation', $result);
+        $this->assertArrayHasKey('salesByMachine', $result);
         $this->assertArrayHasKey('role', $result);
     }
 
@@ -240,6 +244,16 @@ final class GetDashboardOverviewTest extends TestCase
         $this->assertArrayHasKey('low_stock_machines', $result['stats']);
         $this->assertArrayHasKey('pending_transfers', $result['stats']);
         $this->assertArrayHasKey('active_routes', $result['stats']);
+    }
+
+    public function test_chart_datasets_have_expected_shapes(): void
+    {
+        $result = $this->query->handle();
+
+        $this->assertCount(7, $result['movementTrend']);
+        $this->assertIsArray($result['topSoldProducts']);
+        $this->assertIsArray($result['salesByLocation']);
+        $this->assertIsArray($result['salesByMachine']);
     }
 
     public function test_returns_user_role(): void

@@ -187,8 +187,12 @@ final class RouteScheduleService
             return collect();
         }
 
+        $tenantId = $routes->first()?->tenant_id;
+
         return User::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereIn('route_id', $routes->pluck('id'))
+            ->whereHas('roles', fn ($query) => $query->where('name', 'conductor'))
             ->pluck('id', 'route_id');
     }
 
@@ -196,7 +200,9 @@ final class RouteScheduleService
     {
         return $route->driver_user_id
             ?? User::query()
+                ->where('tenant_id', $route->tenant_id)
                 ->where('route_id', $route->id)
+                ->whereHas('roles', fn ($query) => $query->where('name', 'conductor'))
                 ->value('id');
     }
 }

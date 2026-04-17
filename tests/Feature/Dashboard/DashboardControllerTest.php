@@ -40,6 +40,10 @@ final class DashboardControllerTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('dashboard');
+        $response->assertSee('Últimos movimientos');
+        $response->assertSee('Productos más vendidos');
+        $response->assertSee('Ventas por ubicación');
+        $response->assertSee('Ventas por máquina');
     }
 
     public function test_conductor_is_redirected_to_driver_dashboard(): void

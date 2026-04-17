@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Tenant\Traits\BelongsToTenant;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Factura formal para GACOV SaaS.
@@ -56,7 +58,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 final class Invoice extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $fillable = [
         'prefix',
@@ -256,19 +258,21 @@ final class Invoice extends Model
      */
     public function registerPayment(float $amount, string $method, ?string $reference = null): InvoicePayment
     {
-        $payment = $this->payments()->create([
-            'tenant_id' => $this->tenant_id,
-            'amount' => $amount,
-            'payment_date' => now(),
-            'payment_method' => $method,
-            'reference' => $reference,
-        ]);
+        return DB::transaction(function () use ($amount, $method, $reference): InvoicePayment {
+            $payment = $this->payments()->create([
+                'tenant_id' => $this->tenant_id,
+                'amount' => $amount,
+                'payment_date' => now(),
+                'payment_method' => $method,
+                'reference' => $reference,
+            ]);
 
-        $this->paid_amount = (float) $this->paid_amount + $amount;
-        $this->calculateTotals();
-        $this->save();
+            $this->paid_amount = (float) $this->paid_amount + $amount;
+            $this->calculateTotals();
+            $this->save();
 
-        return $payment;
+            return $payment;
+        });
     }
 
     /**

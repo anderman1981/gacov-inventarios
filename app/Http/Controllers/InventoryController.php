@@ -28,6 +28,7 @@ use App\Support\SearchHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -287,6 +288,12 @@ final class InventoryController extends Controller
             ->sum('stock.quantity');
         $visibleUnits = (int) $routes->getCollection()
             ->sum(fn (Route $route): int => (int) $route->vehicle_stocks->sum('quantity'));
+        $conductors = User::query()
+            ->where('tenant_id', auth()->user()?->tenant_id)
+            ->where('is_active', true)
+            ->whereHas('roles', fn ($query) => $query->where('name', 'conductor'))
+            ->orderBy('name')
+            ->get();
 
         return view('inventory.vehicle-stocks', compact(
             'routes',
@@ -296,7 +303,93 @@ final class InventoryController extends Controller
             'visibleUnits',
             'perPage',
             'perPageOptions',
+            'conductors',
         ));
+    }
+
+    public function storeVehicle(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('drivers.assign_routes'), 403);
+
+        $tenantId = auth()->user()?->tenant_id;
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'code' => [
+                'required',
+                'string',
+                'max:40',
+                Rule::unique('routes', 'code')->where(fn ($query) => $query->where('tenant_id', $tenantId)),
+            ],
+            'vehicle_plate' => ['nullable', 'string', 'max:40'],
+            'driver_user_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId)),
+            ],
+        ]);
+
+        $driverId = $validated['driver_user_id'] ?? null;
+
+        $tenantId = auth()->user()?->tenant_id;
+
+        $route = DB::transaction(function () use ($validated, $driverId, $tenantId): Route {
+            $route = Route::query()->create([
+                'tenant_id' => $tenantId,
+                'name' => trim($validated['name']),
+                'code' => strtoupper(trim($validated['code'])),
+                'vehicle_plate' => $validated['vehicle_plate'] !== null ? strtoupper(trim((string) $validated['vehicle_plate'])) : null,
+                'driver_user_id' => $driverId,
+                'is_active' => true,
+            ]);
+
+            Warehouse::query()->create([
+                'tenant_id' => $tenantId,
+                'name' => 'Vehículo '.$route->code,
+                'code' => 'VH-'.$route->code,
+                'type' => 'vehiculo',
+                'route_id' => $route->id,
+                'responsible_user_id' => $driverId,
+                'is_active' => true,
+            ]);
+
+            if ($driverId !== null) {
+                User::query()->whereKey($driverId)->update(['route_id' => $route->id]);
+            }
+
+            return $route;
+        });
+
+        return redirect()
+            ->route('inventory.vehicles')
+            ->with('success', "Vehículo {$route->code} creado correctamente.");
+    }
+
+    public function destroyVehicle(Route $route): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('drivers.assign_routes'), 403);
+        abort_unless($route->is_active, 404);
+
+        DB::transaction(function () use ($route): void {
+            User::query()->where('route_id', $route->id)->update(['route_id' => null]);
+
+            Warehouse::query()
+                ->where('route_id', $route->id)
+                ->where('type', 'vehiculo')
+                ->update([
+                    'is_active' => false,
+                    'responsible_user_id' => null,
+                ]);
+
+            $route->update([
+                'driver_user_id' => null,
+                'is_active' => false,
+            ]);
+        });
+
+        return redirect()
+            ->route('inventory.vehicles')
+            ->with('success', "Vehículo {$route->code} eliminado correctamente.");
     }
 
     public function machineStocks(Request $request, InventoryAdjustmentService $adjustmentService): View

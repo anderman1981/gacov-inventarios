@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\AppModule;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Models\TenantBillingProfile;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,6 +33,11 @@ final class InventoryInitialImportTest extends TestCase
         $warehouse->save();
 
         $response = $this->actingAs($user)->get(route('inventory.import.form'));
+
+        // Debug: show redirect location if 302
+        if ($response->status() === 302) {
+            $this->fail('Redirected to: '.$response->headers->get('Location'));
+        }
 
         $response->assertOk();
         $response->assertSee('Importar carga inicial');
@@ -112,21 +119,43 @@ final class InventoryInitialImportTest extends TestCase
 
     private function createTenant(): Tenant
     {
-        return Tenant::create([
+        // Create inventory module if not exists
+        AppModule::firstOrCreate(
+            ['key' => 'inventory'],
+            [
+                'name' => 'Inventario',
+                'phase_required' => 1,
+                'sort_order' => 2,
+                'is_active' => true,
+            ]
+        );
+
+        $tenant = Tenant::create([
             'name' => 'Tenant de prueba',
-            'slug' => 'tenant-prueba',
+            'slug' => 'tenant-prueba-'.uniqid(),
             'email' => 'tenant@example.com',
             'is_active' => true,
         ]);
+
+        // Create billing profile with phase 1 access for module middleware
+        TenantBillingProfile::create([
+            'tenant_id' => $tenant->id,
+            ...TenantBillingProfile::defaultPayload(1),
+        ]);
+
+        return $tenant;
     }
 
     private function authorizedUser(Tenant $tenant): User
     {
+        // Create required permissions
+        Permission::findOrCreate('inventory.view', 'web');
         Permission::findOrCreate('inventory.load_excel', 'web');
 
         $user = User::factory()->create([
             'tenant_id' => $tenant->id,
         ]);
+        $user->givePermissionTo('inventory.view');
         $user->givePermissionTo('inventory.load_excel');
 
         return $user;

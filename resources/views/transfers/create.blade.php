@@ -40,7 +40,7 @@
                     <label class="form-label" for="origin_warehouse_id">Bodega origen <span style="color:var(--gacov-error)">*</span></label>
                     <select name="origin_warehouse_id" id="origin_warehouse_id" class="form-input @error('origin_warehouse_id') is-invalid @enderror" onchange="updateStockDisplay()">
                         <option value="">— Seleccionar bodega —</option>
-                        @foreach($warehouses as $warehouse)
+                        @foreach($originWarehouses as $warehouse)
                         <option value="{{ $warehouse->id }}" {{ old('origin_warehouse_id') == $warehouse->id ? 'selected' : '' }}>
                             {{ $warehouse->name }}
                             @php
@@ -64,7 +64,7 @@
                     <label class="form-label" for="destination_warehouse_id">Bodega destino <span style="color:var(--gacov-error)">*</span></label>
                     <select name="destination_warehouse_id" id="destination_warehouse_id" class="form-input @error('destination_warehouse_id') is-invalid @enderror">
                         <option value="">— Seleccionar bodega —</option>
-                        @foreach($warehouses as $warehouse)
+                        @foreach($destinationWarehouses as $warehouse)
                         <option value="{{ $warehouse->id }}" {{ old('destination_warehouse_id') == $warehouse->id ? 'selected' : '' }}>
                             {{ $warehouse->name }}
                             @php

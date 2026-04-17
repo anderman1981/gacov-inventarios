@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Tenant\Services\TenantContext;
 use App\Http\Requests\StoreRouteScheduleAssignmentRequest;
 use App\Models\Route as ClientRoute;
 use App\Models\User;
@@ -16,6 +17,7 @@ final class RouteScheduleCalendarController extends Controller
 {
     public function __construct(
         private readonly RouteScheduleService $routeScheduleService,
+        private readonly TenantContext $tenantContext,
     ) {}
 
     public function index(Request $request): View
@@ -23,8 +25,10 @@ final class RouteScheduleCalendarController extends Controller
         abort_unless(auth()->user()?->can('drivers.assign_routes'), 403);
 
         $weekStart = $this->routeScheduleService->weekStart($request->string('week_start')->toString());
+        $tenantId = $this->currentTenantId();
 
         $conductors = User::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->role('conductor')
             ->where('is_active', true)
             ->orderBy('name')
@@ -50,7 +54,10 @@ final class RouteScheduleCalendarController extends Controller
             ->firstOrFail();
 
         $driver = $request->filled('target_driver_id')
-            ? User::query()->whereKey($request->integer('target_driver_id'))->first()
+            ? User::query()
+                ->where('tenant_id', $request->user()?->tenant_id)
+                ->whereKey($request->integer('target_driver_id'))
+                ->first()
             : null;
 
         $this->routeScheduleService->scheduleRouteForDate(
@@ -65,5 +72,10 @@ final class RouteScheduleCalendarController extends Controller
         return redirect()
             ->route('operations.routes.calendar', ['week_start' => $weekStart->toDateString()])
             ->with('success', 'Programación de ruta actualizada.');
+    }
+
+    private function currentTenantId(): ?int
+    {
+        return $this->tenantContext->getTenantId() ?? auth()->user()?->tenant_id;
     }
 }
