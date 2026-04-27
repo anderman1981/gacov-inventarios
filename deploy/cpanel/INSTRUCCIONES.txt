@@ -38,6 +38,19 @@ Debes dejar esto:
 /home/USUARIO/
 ├── gacov_app/
 └── public_html/
+
+### Si staging va en subcarpeta
+
+Para una URL como `https://ingacov.com/staging-inv/` la estructura objetivo cambia a:
+
+```text
+/home/USUARIO/
+├── gacov_app/
+└── public_html/
+    └── staging-inv/
+```
+
+En ese caso no debes publicar el paquete raíz `public_html/` en la carpeta principal, sino el paquete preparado para subcarpeta `staging-inv/`.
 ```
 
 `public_html/index.php` ya viene preparado para apuntar a `../gacov_app`.
@@ -47,20 +60,21 @@ Debes dejar esto:
 1. En cPanel crea una base de datos MySQL.
 2. Crea un usuario MySQL y asígnale todos los permisos sobre esa base.
 3. En el File Manager sube `gacov_app.zip` a tu carpeta home y descomprímelo.
-4. Sube `public_html.zip` dentro de `public_html/` y descomprímelo.
-5. Verifica que la app quede en `/home/USUARIO/gacov_app`.
-6. Verifica que el sitio público quede en `/home/USUARIO/public_html`.
-7. Abre en el navegador `https://tu-dominio.com/install.php`.
-8. Completa el formulario con:
+4. Si publicarás en la raíz del dominio, sube `public_html.zip` dentro de `public_html/` y descomprímelo.
+5. Si publicarás staging en `https://ingacov.com/staging-inv/`, sube el contenido del paquete `staging-inv/` dentro de `public_html/staging-inv/`.
+6. Verifica que la app quede en `/home/USUARIO/gacov_app`.
+7. Verifica que el sitio público quede en `/home/USUARIO/public_html` o en `/home/USUARIO/public_html/staging-inv`.
+8. Abre en el navegador `https://tu-dominio.com/install.php` o `https://tu-dominio.com/staging-inv/install.php`.
+9. Completa el formulario con:
    - URL del sistema
    - host MySQL, normalmente `localhost`
    - puerto `3306`
    - base de datos
    - usuario
    - contraseña
-9. Ejecuta la instalación.
-10. Entra al login y cambia contraseñas iniciales.
-11. Elimina `public_html/install.php`.
+10. Ejecuta la instalación.
+11. Entra al login y cambia contraseñas iniciales.
+12. Elimina `public_html/install.php` o `public_html/staging-inv/install.php`.
 
 ## Credenciales iniciales que crea el seeder
 
@@ -81,7 +95,7 @@ Debes dejar esto:
 
 ## Validaciones rápidas después de subir
 
-- `https://tu-dominio.com/` carga login
+- `https://tu-dominio.com/` o `https://tu-dominio.com/staging-inv/` carga login
 - `https://tu-dominio.com/up` responde correctamente
 - puedes iniciar sesión con super admin
 - `storage/logs/laravel.log` no muestra errores críticos

@@ -1,17 +1,17 @@
 {
-  "resources/css/app.css": {
+  "frontend/resources/css/app.css": {
     "file": "assets/app-DIbcF-6J.css",
     "name": "app",
     "names": [
       "app.css"
     ],
-    "src": "resources/css/app.css",
+    "src": "frontend/resources/css/app.css",
     "isEntry": true
   },
-  "resources/js/app.js": {
+  "frontend/resources/js/app.js": {
     "file": "assets/app-BU6mFzGd.js",
     "name": "app",
-    "src": "resources/js/app.js",
+    "src": "frontend/resources/js/app.js",
     "isEntry": true
   }
 }

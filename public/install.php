@@ -88,7 +88,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $defaultHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $defaultScheme = (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$defaultUrl = $defaultScheme.'://'.$defaultHost;
+$scriptDirectory = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')));
+$scriptDirectory = $scriptDirectory === '/' ? '' : rtrim($scriptDirectory, '/');
+$defaultUrl = $defaultScheme.'://'.$defaultHost.$scriptDirectory;
 
 echo renderPage(
     'Instalador GACOV para cPanel',
@@ -160,6 +162,8 @@ function buildEnvContent(array $input): string
         'APP_KEY='.$appKey,
         'APP_DEBUG=false',
         'APP_URL='.$appUrl,
+        'FRONTEND_URL='.$appUrl,
+        'ASSET_URL='.$appUrl,
         '',
         'APP_LOCALE=es_CO',
         'APP_FALLBACK_LOCALE=es',

@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     @php($hasViteAssets = file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
     @if($hasViteAssets)
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['frontend/resources/css/app.css', 'frontend/resources/js/app.js'])
     @endif
 </head>
 <body class="auth-page">
