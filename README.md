@@ -17,8 +17,13 @@ gacov-inventarios/
 ├── app/                    # Adaptadores Laravel: HTTP, modelos, providers, components
 ├── config/                 # Configuración por arrays PHP
 ├── database/               # Migrations, factories y seeders
+├── frontend/               # Código fuente del frontend compilado con Vite
+│   └── resources/
+│       ├── css/
+│       ├── images/
+│       └── js/
 ├── public/                 # Único webroot
-├── resources/              # Blade, CSS y JS
+├── resources/              # Blade views del backend Laravel
 ├── routes/                 # Rutas segmentadas por módulo
 ├── src/
 │   ├── Application/        # Queries y casos de uso AMR
@@ -44,6 +49,12 @@ gacov-inventarios/
 6. Ejecuta `npm install`.
 7. Ejecuta `npm run build`.
 8. Inicia con `php artisan serve`.
+
+## Separación backend / frontend
+
+- El backend queda en la raíz del proyecto con Laravel, `app/`, `src/`, `routes/`, `config/` y `database/`.
+- El frontend fuente queda concentrado en `frontend/resources/` y se compila hacia `public/build` usando Vite.
+- Las vistas Blade siguen en `resources/views/` porque forman parte de la capa HTTP del backend.
 
 ## Validaciones rápidas
 

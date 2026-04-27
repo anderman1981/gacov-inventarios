@@ -1,0 +1,21 @@
+<?php
+declare(strict_types=1);
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (DB::getDriverName() !== 'mysql') { return; }
+        DB::statement("ALTER TABLE products MODIFY COLUMN category ENUM(
+            'bebida_fria','bebida_caliente','cafe','suplemento','snack','insumo','otro'
+        ) NOT NULL DEFAULT 'otro'");
+    }
+    public function down(): void
+    {
+        if (DB::getDriverName() !== 'mysql') { return; }
+        DB::statement("ALTER TABLE products MODIFY COLUMN category ENUM(
+            'bebida_fria','bebida_caliente','snack','insumo','otro'
+        ) NOT NULL DEFAULT 'otro'");
+    }
+};

@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Providers;
+
+use App\Contract\Repository\ProductRepositoryInterface;
+use App\Contract\Repository\TransferOrderRepositoryInterface;
+use App\Domain\Shared\CompanyProfile;
+use App\Domain\Tenant\Observers\SubscriptionObserver;
+use App\Infrastructure\Persistence\Eloquent\ProductRepository;
+use App\Infrastructure\Persistence\Eloquent\TransferOrderRepository;
+use App\Models\Subscription;
+use App\Support\Browser\ChromeDevToolsMcpClient;
+use App\Support\Config\AmrConfig;
+use App\Support\Documentation\ChromeDevToolsMcpRepositoryAnalyzer;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\ServiceProvider;
+
+final class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(AmrConfig::class);
+        $this->app->singleton(ChromeDevToolsMcpClient::class);
+        $this->app->singleton(ChromeDevToolsMcpRepositoryAnalyzer::class);
+
+        $this->app->singleton(CompanyProfile::class, function (Application $app): CompanyProfile {
+            return $app->make(AmrConfig::class)->companyProfile();
+        });
+
+        $this->app->bind(ProductRepositoryInterface::class, ProductRepository::class);
+        $this->app->bind(TransferOrderRepositoryInterface::class, TransferOrderRepository::class);
+    }
+
+    public function boot(): void
+    {
+        // Registrar observer para sincronizar fases comerciales → técnicas
+        Subscription::observe(SubscriptionObserver::class);
+    }
+}

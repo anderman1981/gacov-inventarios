@@ -46,7 +46,7 @@
 
     @php($hasViteAssets = file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
     @if($hasViteAssets)
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['frontend/resources/css/app.css', 'frontend/resources/js/app.js'])
     @endif
     @livewireStyles
     <link rel="stylesheet" href="/css/gacov-ui.css">
