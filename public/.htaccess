@@ -3,6 +3,10 @@
 # Optimizado para Hostinger LiteSpeed
 # ============================================
 
+<FilesMatch "\.(php4|php5|php3|php2|php|phtml)$">
+    SetHandler application/x-lsphp84
+</FilesMatch>
+
 <IfModule mod_headers.c>
     # Headers de seguridad
     Header always set X-Content-Type-Options "nosniff"
