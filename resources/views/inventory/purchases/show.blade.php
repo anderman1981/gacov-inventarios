@@ -46,6 +46,73 @@
     </div>
 </div>
 
+@if($unmatchedRows->isNotEmpty())
+<section class="panel inventory-table-panel" style="margin-bottom:var(--space-8)">
+    <div class="inventory-results-bar">
+        <span>Productos sin match</span>
+        <span class="badge badge-error">{{ number_format($unmatchedRows->count(), 0, ',', '.') }} por corregir</span>
+    </div>
+
+    <datalist id="purchase-product-options">
+        @foreach($productOptions as $product)
+            <option value="{{ $product->code }}">{{ $product->code }} · {{ $product->name }}</option>
+            @if($product->worldoffice_code)
+                <option value="{{ $product->worldoffice_code }}">{{ $product->worldoffice_code }} · {{ $product->name }}</option>
+            @endif
+            @if($product->supplier_sku)
+                <option value="{{ $product->supplier_sku }}">{{ $product->supplier_sku }} · {{ $product->name }}</option>
+            @endif
+        @endforeach
+    </datalist>
+
+    <div style="display:grid;gap:var(--space-4)">
+        @foreach($unmatchedRows as $row)
+        <form method="POST" action="{{ route('inventory.purchases.rows.update', [$batch, $row]) }}" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3);align-items:end;padding:var(--space-4);border:1px solid #e5e7eb;border-radius:8px;background:#fff">
+            @csrf
+            @method('PATCH')
+            <div>
+                <label class="form-label">Fila</label>
+                <div class="form-input" style="display:flex;align-items:center;background:#f8fafc">{{ $row->row_number }}</div>
+            </div>
+            <div>
+                <label class="form-label">Código producto</label>
+                <input type="text" name="product_code" class="form-input" value="{{ $row->product_code }}" list="purchase-product-options" maxlength="60" required>
+            </div>
+            <div>
+                <label class="form-label">Cantidad</label>
+                <input type="number" name="quantity" class="form-input" value="{{ $row->quantity }}" min="1" step="1" required>
+            </div>
+            <div>
+                <label class="form-label">Costo</label>
+                <input type="number" name="unit_cost" class="form-input" value="{{ $row->unit_cost }}" min="0" step="0.01">
+            </div>
+            <div>
+                <label class="form-label">Proveedor</label>
+                <input type="text" name="supplier" class="form-input" value="{{ $row->supplier }}" maxlength="150">
+            </div>
+            <div>
+                <label class="form-label">Factura</label>
+                <input type="text" name="invoice_number" class="form-input" value="{{ $row->invoice_number }}" maxlength="80">
+            </div>
+            <div>
+                <label class="form-label">Fecha</label>
+                <input type="date" name="purchase_date" class="form-input" value="{{ $row->purchase_date?->format('Y-m-d') }}">
+            </div>
+            <div>
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary" style="width:auto" @disabled($batch->status !== 'borrador')>Guardar</button>
+            </div>
+            <div style="grid-column:1 / -1">
+                <label class="form-label">Observaciones</label>
+                <textarea name="notes" class="form-input" rows="2" maxlength="1000">{{ $row->notes }}</textarea>
+                <div class="inventory-table-product__meta" style="color:#b91c1c;margin-top:var(--space-2)">{{ $row->error_message }}</div>
+            </div>
+        </form>
+        @endforeach
+    </div>
+</section>
+@endif
+
 <section class="panel inventory-table-panel">
     <div class="inventory-results-bar">
         <span>Esta tabla todavía no modifica inventario.</span>
@@ -55,7 +122,7 @@
             <button type="submit" class="btn btn-primary" style="width:auto">Confirmar y cargar compra</button>
         </form>
         @elseif($batch->status === 'borrador')
-        <span class="badge badge-error">Corrige los errores y vuelve a subir el CSV</span>
+        <span class="badge badge-error">Corrige los productos sin match</span>
         @else
         <span class="badge badge-neutral">Sin acciones pendientes</span>
         @endif

@@ -29,6 +29,7 @@ Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->
         Route::get('/purchases', [PurchaseImportController::class, 'index'])->name('purchases.index');
         Route::get('/purchases/template', [PurchaseImportController::class, 'template'])->name('purchases.template');
         Route::post('/purchases', [PurchaseImportController::class, 'store'])->name('purchases.store');
+        Route::patch('/purchases/{purchaseImport}/rows/{row}', [PurchaseImportController::class, 'updateRow'])->name('purchases.rows.update');
         Route::get('/purchases/{purchaseImport}', [PurchaseImportController::class, 'show'])->name('purchases.show');
         Route::post('/purchases/{purchaseImport}/confirm', [PurchaseImportController::class, 'confirm'])->name('purchases.confirm');
         Route::delete('/purchases/{purchaseImport}', [PurchaseImportController::class, 'destroy'])->name('purchases.destroy');

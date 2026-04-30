@@ -6,11 +6,14 @@ namespace App\Http\Controllers;
 
 use App\Application\UseCase\Inventory\ConfirmPurchaseImportHandler;
 use App\Application\UseCase\Inventory\StagePurchaseCsvImportHandler;
+use App\Application\UseCase\Inventory\UpdatePurchaseImportRowHandler;
 use App\Http\Requests\StagePurchaseImportRequest;
+use App\Http\Requests\UpdatePurchaseImportRowRequest;
+use App\Models\Product;
 use App\Models\PurchaseImportBatch;
+use App\Models\PurchaseImportRow;
 use App\Models\Warehouse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use Illuminate\View\View;
 use RuntimeException;
@@ -103,6 +106,15 @@ final class PurchaseImportController extends Controller
         $this->authorizePurchaseImports();
 
         $purchaseImport->load(['warehouse', 'uploader', 'processor', 'discarder']);
+        $unmatchedRows = $purchaseImport->rows()
+            ->where('status', 'error')
+            ->orderBy('row_number')
+            ->get();
+        $productOptions = Product::query()
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->limit(500)
+            ->get(['code', 'worldoffice_code', 'supplier_sku', 'name']);
         $rows = $purchaseImport->rows()
             ->with('product')
             ->orderBy('row_number')
@@ -110,8 +122,31 @@ final class PurchaseImportController extends Controller
 
         return view('inventory.purchases.show', [
             'batch' => $purchaseImport,
+            'unmatchedRows' => $unmatchedRows,
+            'productOptions' => $productOptions,
             'rows' => $rows,
         ]);
+    }
+
+    public function updateRow(
+        UpdatePurchaseImportRowRequest $request,
+        PurchaseImportBatch $purchaseImport,
+        PurchaseImportRow $row,
+        UpdatePurchaseImportRowHandler $handler,
+    ): RedirectResponse {
+        try {
+            $batch = $handler->handle($purchaseImport, $row, $request->validated());
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        $message = (int) $batch->error_rows > 0
+            ? "Fila {$row->row_number} actualizada. Todavía hay {$batch->error_rows} producto(s) sin match."
+            : 'Fila actualizada. Todas las filas están listas para confirmar.';
+
+        return redirect()
+            ->route('inventory.purchases.show', $batch)
+            ->with((int) $batch->error_rows > 0 ? 'error' : 'success', $message);
     }
 
     public function confirm(
