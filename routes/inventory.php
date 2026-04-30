@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\DriverCashController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->group(function () {
@@ -14,6 +15,10 @@ Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->
         Route::get('/vehicles/import/template', [InventoryController::class, 'downloadVehicleImportTemplate'])->name('vehicles.import.template');
         Route::post('/vehicles/import', [InventoryController::class, 'storeVehicleImport'])->name('vehicles.import.store');
         Route::get('/machines', [InventoryController::class, 'machineStocks'])->name('machines');
+        Route::get('/cash', [DriverCashController::class, 'index'])->name('cash.index');
+        Route::get('/cash/create', [DriverCashController::class, 'create'])->name('cash.create');
+        Route::post('/cash', [DriverCashController::class, 'store'])->name('cash.store');
+        Route::get('/cash/{cashDeliveryId}', [DriverCashController::class, 'show'])->name('cash.show');
         Route::get('/machines/import', [InventoryController::class, 'machineImportForm'])->name('machines.import.form');
         Route::get('/machines/import/template', [InventoryController::class, 'downloadMachineImportTemplate'])->name('machines.import.template');
         Route::post('/machines/import', [InventoryController::class, 'storeMachineImport'])->name('machines.import.store');

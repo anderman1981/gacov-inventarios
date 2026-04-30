@@ -39,9 +39,8 @@
                 <div class="form-group">
                     <label class="form-label" for="origin_warehouse_id">Bodega origen <span style="color:var(--gacov-error)">*</span></label>
                     <select name="origin_warehouse_id" id="origin_warehouse_id" class="form-input @error('origin_warehouse_id') is-invalid @enderror" onchange="updateStockDisplay()">
-                        <option value="">— Seleccionar bodega —</option>
                         @foreach($originWarehouses as $warehouse)
-                        <option value="{{ $warehouse->id }}" {{ old('origin_warehouse_id') == $warehouse->id ? 'selected' : '' }}>
+                        <option value="{{ $warehouse->id }}" {{ (string) old('origin_warehouse_id', $mainWarehouse?->id) === (string) $warehouse->id ? 'selected' : '' }}>
                             {{ $warehouse->name }}
                             @php
                                 $typeLabel = match($warehouse->type) {
@@ -61,29 +60,54 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="destination_warehouse_id">Bodega destino <span style="color:var(--gacov-error)">*</span></label>
-                    <select name="destination_warehouse_id" id="destination_warehouse_id" class="form-input @error('destination_warehouse_id') is-invalid @enderror">
-                        <option value="">— Seleccionar bodega —</option>
-                        @foreach($destinationWarehouses as $warehouse)
-                        <option value="{{ $warehouse->id }}" {{ old('destination_warehouse_id') == $warehouse->id ? 'selected' : '' }}>
+                    <label class="form-label" for="destination_route_warehouse_id">Ruta / vehículo destino <span style="color:var(--gacov-error)">*</span></label>
+                    <select name="destination_route_warehouse_id" id="destination_route_warehouse_id" class="form-input @error('destination_route_warehouse_id') is-invalid @enderror" onchange="updateDestinationWarehouse()">
+                        <option value="">— Seleccionar ruta o vehículo —</option>
+                        @foreach($destinationRouteWarehouses as $warehouse)
+                        <option value="{{ $warehouse->id }}" data-route-id="{{ $warehouse->route_id }}" {{ old('destination_route_warehouse_id') == $warehouse->id ? 'selected' : '' }}>
                             {{ $warehouse->name }}
-                            @php
-                                $typeLabel = match($warehouse->type) {
-                                    'bodega'   => 'Bodega',
-                                    'vehiculo' => 'Vehículo',
-                                    'maquina'  => 'Máquina',
-                                    default    => $warehouse->type,
-                                };
-                            @endphp
-                            ({{ $typeLabel }})
+                            @if($warehouse->route)
+                            ({{ $warehouse->route->code }})
+                            @endif
                         </option>
                         @endforeach
                     </select>
-                    @error('destination_warehouse_id')
+                    @error('destination_route_warehouse_id')
                     <span class="form-error">{{ $message }}</span>
                     @enderror
                 </div>
             </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5);margin-top:var(--space-4)">
+                <div class="form-group">
+                    <label class="form-label" for="destination_machine_warehouse_id">Máquina destino</label>
+                    <select name="destination_machine_warehouse_id" id="destination_machine_warehouse_id" class="form-input @error('destination_machine_warehouse_id') is-invalid @enderror" onchange="updateDestinationWarehouse()">
+                        <option value="">— Sin máquina específica —</option>
+                        @foreach($destinationMachineWarehouses as $warehouse)
+                        <option
+                            value="{{ $warehouse->id }}"
+                            data-route-id="{{ $warehouse->machine?->route_id }}"
+                            {{ old('destination_machine_warehouse_id') == $warehouse->id ? 'selected' : '' }}>
+                            {{ $warehouse->name }}
+                            @if($warehouse->machine)
+                            ({{ $warehouse->machine->code }})
+                            @endif
+                        </option>
+                        @endforeach
+                    </select>
+                    @error('destination_machine_warehouse_id')
+                    <span class="form-error">{{ $message }}</span>
+                    @enderror
+                    <div style="margin-top:6px;font-size:12px;color:var(--gacov-text-muted)">
+                        Si eliges máquina, el traslado se registra hacia esa bodega. Si no, queda sobre el vehículo.
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" name="destination_warehouse_id" id="destination_warehouse_id" value="{{ old('destination_warehouse_id') }}">
+            @error('destination_warehouse_id')
+            <span class="form-error">{{ $message }}</span>
+            @enderror
 
             <div class="form-group" style="margin-top:var(--space-4)">
                 <label class="form-label" for="notes">Notas / observaciones</label>
@@ -260,11 +284,39 @@ function updateStockDisplay() {
     });
 }
 
+function updateDestinationWarehouse() {
+    const routeSelect = document.getElementById('destination_route_warehouse_id');
+    const machineSelect = document.getElementById('destination_machine_warehouse_id');
+    const hiddenDestination = document.getElementById('destination_warehouse_id');
+    const selectedRouteWarehouseId = routeSelect.value;
+    const selectedRouteOption = routeSelect.options[routeSelect.selectedIndex];
+    const selectedRouteId = selectedRouteOption ? selectedRouteOption.value : '';
+
+    Array.from(machineSelect.options).forEach((option, index) => {
+        if (index === 0) {
+            option.hidden = false;
+            return;
+        }
+
+        const machineRouteId = option.dataset.routeId ?? '';
+        const shouldShow = selectedRouteId !== '' && machineRouteId === selectedRouteOption?.dataset.routeId;
+        option.hidden = !shouldShow;
+
+        if (!shouldShow && option.selected) {
+            machineSelect.value = '';
+        }
+    });
+
+    hiddenDestination.value = machineSelect.value || selectedRouteWarehouseId || '';
+}
+
 // Inicializar si ya hay valor (old input)
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('origin_warehouse_id').value) {
         updateStockDisplay();
     }
+
+    updateDestinationWarehouse();
 
     const productRows = Array.from(document.querySelectorAll('.transfer-product-row'));
     const productSearchInput = document.getElementById('transfer-product-search');

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.amr.gacov-inventarios.queue</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/php</string>
+        <string>artisan</string>
+        <string>queue:work</string>
+        <string>--tries=1</string>
+        <string>--timeout=0</string>
+        <string>--sleep=3</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/andersonmartinezrestrepo/DEV-PROJECTS/INVERSIONES GACOV/gacov-inventarios</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/andersonmartinezrestrepo/DEV-PROJECTS/INVERSIONES GACOV/gacov-inventarios/storage/logs/service-queue.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/andersonmartinezrestrepo/DEV-PROJECTS/INVERSIONES GACOV/gacov-inventarios/storage/logs/service-queue-error.log</string>
+</dict>
+</plist>

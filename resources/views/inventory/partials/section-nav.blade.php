@@ -54,4 +54,18 @@
     </a>
     @endmoduleEnabled
     @endcan
+
+    @canany(['cash.manage', 'cash.view'])
+    @moduleEnabled('inventory')
+    <a href="{{ route('inventory.cash.index') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'inventory.cash.index' || str_starts_with($inventoryRoute, 'inventory.cash.') || str_starts_with($inventoryRoute, 'cash.') ? 'active' : '' }}" title="Dinero · Efectivo y monedas colombianas" aria-label="Dinero">
+        <span class="inventory-section-nav__icon">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm2 1v8h10V6H5zm5 1.25a2.75 2.75 0 110 5.5 2.75 2.75 0 010-5.5zM6.5 7.5a.75.75 0 100 1.5.75.75 0 000-1.5zm7 3.75a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+        </span>
+        <span class="inventory-section-nav__text">
+            <span class="inventory-section-nav__label">Dinero</span>
+            <span class="inventory-section-nav__copy">Efectivo y monedas CO</span>
+        </span>
+    </a>
+    @endmoduleEnabled
+    @endcanany
 </nav>

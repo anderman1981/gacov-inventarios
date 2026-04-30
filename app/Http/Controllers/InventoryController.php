@@ -40,7 +40,7 @@ final class InventoryController extends Controller
     {
         abort_unless(auth()->user()?->can('inventory.view'), 403);
 
-        $mainWarehouse = Warehouse::where('type', 'bodega')->first();
+        $mainWarehouse = $this->resolveMainWarehouse();
 
         $stocks = null;
         $totalUnits = 0;
@@ -54,10 +54,12 @@ final class InventoryController extends Controller
 
         if ($mainWarehouse) {
             $baseQuery = Stock::query()
+                ->withoutGlobalScopes()
                 ->select('stock.*')
-                ->with('product')
+                ->with(['product' => fn ($query) => $query->withoutGlobalScopes()])
                 ->join('products', 'products.id', '=', 'stock.product_id')
                 ->where('stock.warehouse_id', $mainWarehouse->id)
+                ->where('products.code', 'not like', 'CASH-%')
                 ->when($search !== '', function ($query) use ($search): void {
                     $query->where(function ($nestedQuery) use ($search): void {
                         $nestedQuery->where('products.name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
@@ -202,7 +204,10 @@ final class InventoryController extends Controller
         }
 
         if ($search = $request->input('search')) {
-            $query->whereHas('product', fn ($q) => $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%"));
+            $query->whereHas('product', function ($q) use ($search): void {
+                $q->where('name', 'like', "%" . SearchHelper::escapeLike($search) . "%")
+                    ->orWhere('code', 'like', "%" . SearchHelper::escapeLike($search) . "%");
+            });
         }
 
         if ($from = $request->input('from')) {
@@ -240,7 +245,18 @@ final class InventoryController extends Controller
         $search = trim((string) $request->input('search'));
 
         $routeQuery = Route::query()
+            ->withoutGlobalScopes()
             ->where('is_active', true);
+
+        if (($tenantId = $this->currentTenantId()) !== null) {
+            $routeQuery->where(function ($query) use ($tenantId): void {
+                $query->where('routes.tenant_id', $tenantId)
+                    ->orWhere(function ($legacyQuery) use ($tenantId): void {
+                        $legacyQuery->whereNull('routes.tenant_id')
+                            ->whereHas('users', fn ($userQuery) => $userQuery->where('tenant_id', $tenantId));
+                    });
+            });
+        }
 
         if ($search !== '') {
             $routeQuery->where(function ($query) use ($search): void {
@@ -257,15 +273,17 @@ final class InventoryController extends Controller
             ->paginate($perPage)
             ->withQueryString()
             ->through(function (Route $route) use ($adjustmentService): Route {
-                $vehicleWarehouse = Warehouse::where('route_id', $route->id)
+                $vehicleWarehouse = Warehouse::withoutGlobalScopes()->where('route_id', $route->id)
                     ->where('type', 'vehiculo')
                     ->first();
 
                 $route->vehicle_warehouse = $vehicleWarehouse;
                 $route->vehicle_stocks = $vehicleWarehouse
-                    ? Stock::with('product')
+                    ? Stock::withoutGlobalScopes()
+                        ->with(['product' => fn ($query) => $query->withoutGlobalScopes()])
                         ->where('warehouse_id', $vehicleWarehouse->id)
                         ->where('quantity', '>', 0)
+                        ->whereHas('product', fn ($query) => $query->withoutGlobalScopes()->where('code', 'not like', 'CASH-%'))
                         ->get()
                         ->sortBy('product.name')
                     : collect();
@@ -278,13 +296,17 @@ final class InventoryController extends Controller
 
         $totalRoutes = (clone $routeQuery)->count();
         $configuredVehicles = Warehouse::query()
+            ->withoutGlobalScopes()
             ->where('type', 'vehiculo')
             ->whereIn('route_id', $routeIdsSubquery)
             ->count();
         $totalUnits = (int) Stock::query()
+            ->withoutGlobalScopes()
             ->join('warehouses', 'warehouses.id', '=', 'stock.warehouse_id')
+            ->join('products', 'products.id', '=', 'stock.product_id')
             ->where('warehouses.type', 'vehiculo')
             ->whereIn('warehouses.route_id', $routeIdsSubquery)
+            ->where('products.code', 'not like', 'CASH-%')
             ->sum('stock.quantity');
         $visibleUnits = (int) $routes->getCollection()
             ->sum(fn (Route $route): int => (int) $route->vehicle_stocks->sum('quantity'));
@@ -399,7 +421,18 @@ final class InventoryController extends Controller
         $perPage = $this->resolvePerPage($request, 12);
         $perPageOptions = [6, 12, 24, 48];
         $machineQuery = Machine::with('route')
+            ->withoutGlobalScopes()
             ->where('is_active', true);
+
+        if (($tenantId = $this->currentTenantId()) !== null) {
+            $machineQuery->where(function ($query) use ($tenantId): void {
+                $query->where('machines.tenant_id', $tenantId)
+                    ->orWhere(function ($legacyQuery) use ($tenantId): void {
+                        $legacyQuery->whereNull('machines.tenant_id')
+                            ->whereHas('route', fn ($routeQuery) => $routeQuery->withoutGlobalScopes()->where('tenant_id', $tenantId));
+                    });
+            });
+        }
 
         if ($search = trim((string) $request->input('search'))) {
             $machineQuery->where(function ($query) use ($search): void {
@@ -419,15 +452,17 @@ final class InventoryController extends Controller
             ->paginate($perPage)
             ->withQueryString()
             ->through(function (Machine $machine) use ($adjustmentService): Machine {
-                $machineWarehouse = Warehouse::where('machine_id', $machine->id)
+                $machineWarehouse = Warehouse::withoutGlobalScopes()->where('machine_id', $machine->id)
                     ->where('type', 'maquina')
                     ->first();
 
                 $machine->machine_warehouse = $machineWarehouse;
                 $machine->machine_stocks = $machineWarehouse
-                    ? Stock::with('product')
+                    ? Stock::withoutGlobalScopes()
+                        ->with(['product' => fn ($query) => $query->withoutGlobalScopes()])
                         ->where('warehouse_id', $machineWarehouse->id)
                         ->where('quantity', '>', 0)
+                        ->whereHas('product', fn ($query) => $query->withoutGlobalScopes()->where('code', 'not like', 'CASH-%'))
                         ->get()
                         ->sortBy('product.name')
                         ->values()
@@ -444,12 +479,14 @@ final class InventoryController extends Controller
 
         $machinesCollection = $machines->getCollection();
 
-        $routes = Route::where('is_active', true)
+        $routes = Route::withoutGlobalScopes()->where('is_active', true)
+            ->when(($tenantId = $this->currentTenantId()) !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->orderBy('name')
             ->get();
 
         $totalMachines = (clone $machineQuery)->count();
         $configuredWarehouses = Warehouse::query()
+            ->withoutGlobalScopes()
             ->where('type', 'maquina')
             ->whereIn('machine_id', $machineIdsSubquery)
             ->count();
@@ -457,6 +494,7 @@ final class InventoryController extends Controller
             ->get()
             ->filter(function (Machine $machine) use ($adjustmentService): bool {
                 $machineWarehouse = Warehouse::where('machine_id', $machine->id)
+                    ->withoutGlobalScopes()
                     ->where('type', 'maquina')
                     ->first();
 
@@ -465,9 +503,12 @@ final class InventoryController extends Controller
             })
             ->count();
         $totalUnits = (int) Stock::query()
+            ->withoutGlobalScopes()
             ->join('warehouses', 'warehouses.id', '=', 'stock.warehouse_id')
+            ->join('products', 'products.id', '=', 'stock.product_id')
             ->where('warehouses.type', 'maquina')
             ->whereIn('warehouses.machine_id', $machineIdsSubquery)
+            ->where('products.code', 'not like', 'CASH-%')
             ->sum('stock.quantity');
         $visibleUnits = (int) $machinesCollection->sum('stock_units');
         $machineBulkInitialAvailable = $machinesPendingInitialLoad > 0;
@@ -484,6 +525,32 @@ final class InventoryController extends Controller
             'perPage',
             'perPageOptions',
         ));
+    }
+
+    private function resolveMainWarehouse(): ?Warehouse
+    {
+        $tenantId = $this->currentTenantId();
+
+        return Warehouse::query()
+            ->withoutGlobalScopes()
+            ->where('type', 'bodega')
+            ->where('is_active', true)
+            ->when($tenantId !== null, function ($query) use ($tenantId): void {
+                $query->where(function ($nestedQuery) use ($tenantId): void {
+                    $nestedQuery->where('tenant_id', $tenantId)
+                        ->orWhereNull('tenant_id');
+                });
+            })
+            ->orderByRaw('CASE WHEN tenant_id IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function currentTenantId(): ?int
+    {
+        $tenantId = auth()->user()?->tenant_id;
+
+        return $tenantId !== null ? (int) $tenantId : null;
     }
 
     public function importForm(): View

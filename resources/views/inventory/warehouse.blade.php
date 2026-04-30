@@ -70,14 +70,14 @@
         <div class="badge badge-neutral">Resultados actuales: {{ number_format($stocks?->count() ?? 0, 0, ',', '.') }}</div>
     </div>
     <div class="inventory-filter-card__body">
-        <form method="GET" action="{{ route('inventory.warehouse') }}" class="inventory-filter-form">
+        <form method="GET" action="{{ route('inventory.warehouse') }}" class="inventory-filter-form" data-server-filter-only>
             <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0">
                 <label class="form-label">Buscar producto</label>
-                <input type="text" name="search" class="form-input" placeholder="Nombre o código..." value="{{ request('search') }}">
+                <input type="text" name="search" class="form-input" placeholder="Nombre o código..." value="{{ request('search') }}" oninput="clearTimeout(window.__warehouseSearchTimer); window.__warehouseSearchTimer = setTimeout(() => this.form.submit(), 350)">
             </div>
             <div class="form-group" style="min-width:160px;margin-bottom:0">
                 <label class="form-label">Categoría</label>
-                <select name="category" class="form-input">
+                <select name="category" class="form-input" onchange="this.form.submit()">
                     <option value="">Todas</option>
                     @foreach($categories as $key => $label)
                     <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ $label }}</option>
@@ -86,7 +86,7 @@
             </div>
             <div class="form-group" style="min-width:130px;margin-bottom:0">
                 <label class="form-label">Por página</label>
-                <select name="per_page" class="form-input">
+                <select name="per_page" class="form-input" onchange="this.form.submit()">
                     @foreach($perPageOptions as $option)
                     <option value="{{ $option }}" {{ $perPage === $option ? 'selected' : '' }}>{{ $option }}</option>
                     @endforeach
@@ -111,7 +111,7 @@
     </div>
     @if($stocks && $stocks->count() > 0)
     <div class="table-scroll">
-    <table class="data-table">
+    <table class="data-table" data-server-filter-only>
         <thead>
             <tr>
                 <th>Código</th>
@@ -150,7 +150,7 @@
                 </td>
                 <td>
                     @php $cat = $stock->product->category; @endphp
-                    <span class="badge {{ $cat === 'snack' ? 'badge-info' : ($cat === 'bebida_fria' ? 'badge-neutral' : 'badge-warning') }}">
+                    <span class="badge {{ $cat === 'snack' ? 'badge-info' : ($cat === 'bebida_fria' ? 'badge-neutral' : ($cat === 'dinero' ? 'badge-success' : 'badge-warning')) }}">
                         {{ str_replace('_',' ', $cat) }}
                     </span>
                 </td>

@@ -53,11 +53,28 @@ final class TransferController extends Controller
         abort_unless(auth()->user()?->can('transfers.create'), 403);
 
         $warehouses = Warehouse::where('is_active', true)->orderBy('name')->get();
+        $mainWarehouse = Warehouse::query()
+            ->where('is_active', true)
+            ->where('type', 'bodega')
+            ->orderBy('name')
+            ->first();
+
         $originWarehouses = Warehouse::where('is_active', true)
             ->whereIn('type', ['bodega', 'vehiculo'])
+            ->orderByRaw("CASE WHEN type = 'bodega' THEN 0 ELSE 1 END")
             ->orderBy('name')
             ->get();
-        $destinationWarehouses = Warehouse::where('is_active', true)
+
+        $destinationRouteWarehouses = Warehouse::query()
+            ->with('route')
+            ->where('is_active', true)
+            ->where('type', 'vehiculo')
+            ->orderBy('name')
+            ->get();
+
+        $destinationMachineWarehouses = Warehouse::query()
+            ->with(['machine.route'])
+            ->where('is_active', true)
             ->where('type', 'maquina')
             ->orderBy('name')
             ->get();
@@ -71,8 +88,10 @@ final class TransferController extends Controller
 
         return view('transfers.create', compact(
             'warehouses',
+            'mainWarehouse',
             'originWarehouses',
-            'destinationWarehouses',
+            'destinationRouteWarehouses',
+            'destinationMachineWarehouses',
             'products',
             'allStocks'
         ));

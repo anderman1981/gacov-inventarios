@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.amr.gacov-inventarios.laravel</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/php</string>
+        <string>artisan</string>
+        <string>serve</string>
+        <string>--host=127.0.0.1</string>
+        <string>--port=8000</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/andersonmartinezrestrepo/DEV-PROJECTS/INVERSIONES GACOV/gacov-inventarios</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/andersonmartinezrestrepo/DEV-PROJECTS/INVERSIONES GACOV/gacov-inventarios/storage/logs/service-laravel.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/andersonmartinezrestrepo/DEV-PROJECTS/INVERSIONES GACOV/gacov-inventarios/storage/logs/service-laravel-error.log</string>
+</dict>
+</plist>

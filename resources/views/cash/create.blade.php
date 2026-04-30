@@ -2,13 +2,14 @@
 @section('title', 'Nueva Entrega de Efectivo')
 
 @section('content')
+@include('inventory.partials.section-nav')
 <div class="page-header" style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6)">
-    <a href="{{ route('cash.index') }}" style="color:var(--gacov-text-muted);text-decoration:none">
+    <a href="{{ route('inventory.cash.index') }}" style="color:var(--gacov-text-muted);text-decoration:none">
         <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
     </a>
     <div>
-        <h1 class="page-title">Nueva Entrega de Efectivo</h1>
-        <p class="page-subtitle">Registrar billetes y monedas entregados a un conductor</p>
+        <h1 class="page-title">Nueva Entrega de Dinero</h1>
+        <p class="page-subtitle">Registrar efectivo y monedas colombianas entregadas a un conductor</p>
     </div>
 </div>
 
@@ -33,7 +34,7 @@
 </div>
 @endif
 
-<form method="POST" action="{{ route('cash.store') }}">
+<form method="POST" action="{{ route('inventory.cash.store') }}">
     @csrf
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
@@ -187,7 +188,7 @@
             <p style="font-size:28px;font-weight:700;color:var(--gacov-primary)" id="grand-total">$0</p>
         </div>
         <div style="display:flex;gap:var(--space-3)">
-            <a href="{{ route('cash.index') }}" class="btn" style="width:auto;background:var(--gacov-bg-elevated);color:var(--gacov-text-primary)">Cancelar</a>
+            <a href="{{ route('inventory.cash.index') }}" class="btn" style="width:auto;background:var(--gacov-bg-elevated);color:var(--gacov-text-primary)">Cancelar</a>
             <button type="submit" class="btn btn-primary" style="width:auto">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                 Registrar entrega

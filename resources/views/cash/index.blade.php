@@ -253,10 +253,11 @@
 
 @section('content')
 <div class="cash-shell">
+@include('inventory.partials.section-nav')
 <div class="page-header cash-toolbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4)">
     <div>
-        <h1 class="page-title">Efectivo a Conductores</h1>
-        <p class="page-subtitle">Registro de billetes y monedas entregados para surtir máquinas</p>
+        <h1 class="page-title">Dinero de Inventarios</h1>
+        <p class="page-subtitle">Control de efectivo y monedas colombianas entregadas a conductores y cargadas en máquinas para la operación de Fase 1</p>
         @if($routeFilter)
         <div class="cash-route-chip">
             <span>Filtro activo</span>
@@ -265,7 +266,7 @@
         @endif
     </div>
     @can('cash.manage')
-    <a href="{{ route('cash.create') }}" class="btn btn-primary" style="width:auto">
+    <a href="{{ route('inventory.cash.create') }}" class="btn btn-primary" style="width:auto">
         <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
         Nueva entrega
     </a>
@@ -275,7 +276,7 @@
 {{-- Filtros --}}
 <div class="panel" style="margin-bottom:var(--space-6)">
     <div class="panel-body" style="padding:var(--space-4) var(--space-6)">
-        <form method="GET" action="{{ route('cash.index') }}" class="cash-filters">
+        <form method="GET" action="{{ route('inventory.cash.index') }}" class="cash-filters">
             <div class="form-group" style="margin-bottom:0">
                 <label class="form-label">Ruta</label>
                 <select name="route_id" class="form-input">
@@ -307,35 +308,338 @@
                 <input type="date" name="date_to" class="form-input" value="{{ $dateTo }}">
             </div>
             <button type="submit" class="btn btn-primary" style="width:auto">Filtrar</button>
-            <a href="{{ route('cash.index') }}" style="padding:11px 16px;color:var(--gacov-text-muted);text-decoration:none;font-size:13px;white-space:nowrap">Limpiar</a>
+            <a href="{{ route('inventory.cash.index') }}" style="padding:11px 16px;color:var(--gacov-text-muted);text-decoration:none;font-size:13px;white-space:nowrap">Limpiar</a>
         </form>
     </div>
 </div>
 
+<div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header" style="padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+            <div class="panel-title">Inventario de dinero por bodega</div>
+            <div style="color:#64748b;font-size:13px">
+                Se controla separado del catálogo general aunque comparta la misma tabla de productos. Aquí ves primero la bodega principal y luego los vehículos o máquinas que tengan dinero cargado.
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            @if($mainWarehouse)
+            <span class="cash-pill" style="background:rgba(37,99,235,.10);color:#1d4ed8">{{ number_format($cashInventoryUnits, 0, ',', '.') }} unidades en principal</span>
+            <span class="cash-pill" style="background:rgba(16,185,129,.10);color:#15803d">${{ number_format($cashInventoryTotal, 0, ',', '.') }} principal</span>
+            @endif
+            @can('inventory.adjust')
+            <a href="{{ route('inventory.adjust') }}" class="btn btn-primary" style="width:auto">Carga / ajuste</a>
+            @endcan
+        </div>
+    </div>
+    <div style="display:grid;gap:18px;padding:18px">
+        @forelse($cashWarehouses as $cashWarehouse)
+        @php
+            $warehouse = $cashWarehouse['warehouse'];
+        @endphp
+        <section style="border:1px solid rgba(148,163,184,.22);border-radius:20px;overflow:hidden;background:linear-gradient(180deg,#fff,#f8fafc)">
+            <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+                <div>
+                    <div class="panel-title" style="font-size:16px">{{ $warehouse->name }}</div>
+                    <div style="color:#64748b;font-size:13px">
+                        {{ $cashWarehouse['type_label'] }}
+                        @if($cashWarehouse['context_label'] !== '')
+                        · {{ $cashWarehouse['context_label'] }}
+                        @endif
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <span class="cash-pill" style="background:rgba(37,99,235,.10);color:#1d4ed8">{{ number_format($cashWarehouse['total_units'], 0, ',', '.') }} unidades</span>
+                    <span class="cash-pill" style="background:rgba(16,185,129,.10);color:#15803d">${{ number_format($cashWarehouse['total_value'], 0, ',', '.') }}</span>
+                </div>
+            </div>
+            <div class="cash-table-wrap">
+                <table class="data-table cash-table" style="min-width:980px">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Denominación</th>
+                            <th>Tipo</th>
+                            <th style="text-align:right">Valor unitario</th>
+                            <th style="text-align:right">Cantidad en stock</th>
+                            <th style="text-align:right">Valor inventario</th>
+                            <th style="text-align:right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($cashWarehouse['products'] as $cashProduct)
+                        @php
+                            $isCoin = str_contains((string) $cashProduct->code, 'CASH-C')
+                                || str_contains(mb_strtolower((string) $cashProduct->name), 'moneda');
+                        @endphp
+                        <tr>
+                            <td><code style="font-size:12px;color:var(--gacov-primary)">{{ $cashProduct->code }}</code></td>
+                            <td>
+                                <div style="font-weight:700">{{ $cashProduct->name }}</div>
+                                <div style="font-size:12px;color:var(--gacov-text-muted)">Unidad: {{ $cashProduct->unit_of_measure }}</div>
+                            </td>
+                            <td>
+                                <span class="cash-pill" style="background:{{ $isCoin ? 'rgba(249,115,22,.12)' : 'rgba(34,197,94,.12)' }};color:{{ $isCoin ? '#c2410c' : '#15803d' }}">
+                                    {{ $isCoin ? 'Moneda' : 'Billete' }}
+                                </span>
+                            </td>
+                            <td style="text-align:right;font-weight:700">${{ number_format((int) $cashProduct->unit_price, 0, ',', '.') }}</td>
+                            <td style="text-align:right">{{ number_format((int) $cashProduct->inventory_quantity, 0, ',', '.') }}</td>
+                            <td class="amount-total" style="text-align:right">${{ number_format((int) $cashProduct->inventory_value, 0, ',', '.') }}</td>
+                            <td style="text-align:right">
+                                <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                                    @can('inventory.adjust')
+                                    <a href="{{ route('inventory.adjust', ['warehouse_id' => $warehouse->id, 'product_id' => $cashProduct->id]) }}" class="inventory-action-link">Cargar</a>
+                                    @endcan
+                                    @can('movements.view')
+                                    <a href="{{ route('inventory.movements', ['search' => $cashProduct->code]) }}" class="inventory-action-link">Movimientos</a>
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        @empty
+        <div class="cash-empty">
+            <p style="font-size:15px;font-weight:500;margin-bottom:var(--space-2)">Sin dinero cargado por bodega</p>
+            <p style="font-size:13px">Apenas registres saldo en bodega principal, vehículos o máquinas, aparecerá aquí separado por cada ubicación.</p>
+        </div>
+        @endforelse
+    </div>
+</div>
+
 {{-- Totales del período --}}
+@php
+    $deliveryMetrics = [
+        'total' => (int) ($deliveryTotals->total_amount ?? 0),
+        'bills' => (int) ($deliveryTotals->total_bills ?? 0),
+        'coins' => (int) ($deliveryTotals->total_coins ?? 0),
+        'count' => (int) ($deliveryTotals->records_count ?? 0),
+    ];
+    $stockingMetrics = [
+        'total' => (int) ($stockingCashTotals->total_amount ?? 0),
+        'bills' => (int) ($stockingCashTotals->total_bills ?? 0),
+        'coins' => (int) ($stockingCashTotals->total_coins ?? 0),
+        'count' => (int) ($stockingCashTotals->records_count ?? 0),
+    ];
+@endphp
+
+@if($deliveryMetrics['count'] > 0 || $stockingMetrics['count'] > 0)
+<div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header" style="padding:14px 22px">
+        <div class="panel-title">Resumen de dinero del período</div>
+    </div>
+    <div class="panel-body" style="padding:var(--space-5)">
+        <div style="display:grid;gap:18px">
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+                    <div>
+                        <div class="panel-title" style="font-size:15px">Entregado a conductores</div>
+                        <div style="color:#64748b;font-size:13px">Base para surtido y cambio en ruta.</div>
+                    </div>
+                    <span class="cash-pill">{{ $deliveryMetrics['count'] }} registros</span>
+                </div>
+                <div class="cash-metrics">
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#f43f5e,#8b5cf6)">
+                        <p class="cash-metric__label">Total entregado</p>
+                        <p class="cash-metric__value" style="color:#ef4444">${{ number_format($deliveryMetrics['total'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#10b981,#34d399)">
+                        <p class="cash-metric__label">En billetes</p>
+                        <p class="cash-metric__value" style="color:#16a34a">${{ number_format($deliveryMetrics['bills'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#f59e0b,#f97316)">
+                        <p class="cash-metric__label">En monedas</p>
+                        <p class="cash-metric__value" style="color:#ea580c">${{ number_format($deliveryMetrics['coins'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#0ea5e9,#22c55e)">
+                        <p class="cash-metric__label">Registros</p>
+                        <p class="cash-metric__value">{{ $deliveryMetrics['count'] }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+                    <div>
+                        <div class="panel-title" style="font-size:15px">Cargado a máquinas</div>
+                        <div style="color:#64748b;font-size:13px">Efectivo realmente registrado en surtidos completados.</div>
+                    </div>
+                    <span class="cash-pill" style="background:rgba(34,197,94,.12);color:#15803d">{{ $stockingMetrics['count'] }} surtidos</span>
+                </div>
+                <div class="cash-metrics">
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#2563eb,#06b6d4)">
+                        <p class="cash-metric__label">Total cargado</p>
+                        <p class="cash-metric__value" style="color:#2563eb">${{ number_format($stockingMetrics['total'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#22c55e,#14b8a6)">
+                        <p class="cash-metric__label">Billetes cargados</p>
+                        <p class="cash-metric__value" style="color:#16a34a">${{ number_format($stockingMetrics['bills'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#f59e0b,#fb7185)">
+                        <p class="cash-metric__label">Monedas cargadas</p>
+                        <p class="cash-metric__value" style="color:#ea580c">${{ number_format($stockingMetrics['coins'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="cash-metric" style="--accent:linear-gradient(90deg,#8b5cf6,#ec4899)">
+                        <p class="cash-metric__label">Diferencia entrega/carga</p>
+                        <p class="cash-metric__value" style="color:#7c3aed">${{ number_format($deliveryMetrics['total'] - $stockingMetrics['total'], 0, ',', '.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+@if($recentCashMovements->isNotEmpty())
+<div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header" style="padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div class="panel-title">Movimientos recientes de dinero</div>
+        @can('movements.view')
+        <a href="{{ route('inventory.movements', ['search' => 'CASH-']) }}" class="inventory-action-link">Ver historial</a>
+        @endcan
+    </div>
+    <div class="cash-table-wrap">
+        <table class="data-table cash-table" style="min-width:920px">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Denominación</th>
+                    <th>Tipo</th>
+                    <th style="text-align:right">Cantidad</th>
+                    <th>Origen</th>
+                    <th>Destino</th>
+                    <th>Usuario</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($recentCashMovements as $movement)
+                <tr>
+                    <td style="white-space:nowrap">{{ $movement->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                    <td>
+                        <div style="font-weight:700">{{ $movement->product?->name ?? '—' }}</div>
+                        <div style="font-size:12px;color:var(--gacov-text-muted)">{{ $movement->product?->code ?? '—' }}</div>
+                    </td>
+                    <td>{{ str_replace('_', ' ', $movement->movement_type) }}</td>
+                    <td style="text-align:right">{{ number_format((int) $movement->quantity, 0, ',', '.') }}</td>
+                    <td>{{ $movement->fromWarehouse?->name ?? '—' }}</td>
+                    <td>{{ $movement->toWarehouse?->name ?? '—' }}</td>
+                    <td>{{ $movement->user?->name ?? '—' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
+@if($recentCashTransfers->isNotEmpty())
+<div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header" style="padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div class="panel-title">Traslados recientes de dinero</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+            @can('transfers.create')
+            <a href="{{ route('transfers.create') }}" class="inventory-action-link">Nuevo traslado</a>
+            @endcan
+            @can('transfers.view')
+            <a href="{{ route('transfers.index') }}" class="inventory-action-link">Ver todos</a>
+            @endcan
+        </div>
+    </div>
+    <div class="cash-table-wrap">
+        <table class="data-table cash-table" style="min-width:980px">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Origen</th>
+                    <th>Destino</th>
+                    <th>Dinero incluido</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($recentCashTransfers as $transfer)
+                @php
+                    $cashItems = $transfer->items->filter(fn ($item) => $item->product && str_starts_with($item->product->code, 'CASH-'));
+                @endphp
+                <tr>
+                    <td>
+                        <a href="{{ route('transfers.show', $transfer) }}" style="color:var(--gacov-primary);text-decoration:none;font-weight:700">
+                            {{ $transfer->code }}
+                        </a>
+                    </td>
+                    <td>{{ $transfer->originWarehouse?->name ?? '—' }}</td>
+                    <td>{{ $transfer->destinationWarehouse?->name ?? '—' }}</td>
+                    <td style="font-size:12px;color:var(--gacov-text-secondary)">
+                        {{ $cashItems->map(fn ($item) => $item->product->name.' × '.number_format((int) $item->quantity_requested, 0, ',', '.'))->implode(' · ') ?: '—' }}
+                    </td>
+                    <td><span class="cash-pill">{{ ucfirst($transfer->status) }}</span></td>
+                    <td>{{ $transfer->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
+@if($recentStockingCash->isNotEmpty())
+<div class="panel" style="margin-bottom:var(--space-6)">
+    <div class="panel-header" style="padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div class="panel-title">Últimos surtidos con dinero</div>
+        <span style="color:#64748b;font-size:13px">Registros completados del período filtrado</span>
+    </div>
+    <div class="cash-table-wrap">
+        <table class="data-table cash-table" style="min-width:980px">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Máquina</th>
+                    <th>Ruta</th>
+                    <th>Conductor</th>
+                    <th style="text-align:right">Billetes</th>
+                    <th style="text-align:right">Monedas</th>
+                    <th style="text-align:right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($recentStockingCash as $stocking)
+                <tr>
+                    <td style="font-size:13px;color:var(--gacov-text-secondary);white-space:nowrap">
+                        {{ $stocking->completed_at?->format('d/m/Y H:i') ?? '—' }}
+                    </td>
+                    <td>
+                        <div style="font-weight:700">{{ $stocking->machine?->name ?? 'Máquina' }}</div>
+                        <div style="font-size:12px;color:var(--gacov-text-muted)">{{ $stocking->machine?->code ?? 'Sin código' }}</div>
+                    </td>
+                    <td>
+                        @if($stocking->route)
+                        <span class="cash-pill">{{ $stocking->route->name }}</span>
+                        @else
+                        <span style="color:var(--gacov-text-muted)">Sin ruta</span>
+                        @endif
+                    </td>
+                    <td>{{ $stocking->user?->name ?? '—' }}</td>
+                    <td class="amount-bills" style="text-align:right">${{ number_format((int) $stocking->total_cash_bills, 0, ',', '.') }}</td>
+                    <td class="amount-coins" style="text-align:right">${{ number_format((int) $stocking->total_cash_coins, 0, ',', '.') }}</td>
+                    <td class="amount-total" style="text-align:right">${{ number_format((int) $stocking->total_cash, 0, ',', '.') }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
+{{-- Tabla --}}
 @if($deliveries->isNotEmpty())
 <div class="cash-metrics" style="margin-bottom:var(--space-6)">
-    @php
-        $periodoTotal = $deliveries->sum('total_amount');
-        $periodoBills = $deliveries->sum('total_bills');
-        $periodoCoins = $deliveries->sum('total_coins');
-        $periodoCount = $deliveries->total();
-    @endphp
-    <div class="cash-metric" style="--accent:linear-gradient(90deg,#f43f5e,#8b5cf6)">
-        <p class="cash-metric__label">Total entregado</p>
-        <p class="cash-metric__value" style="color:#ef4444">${{ number_format($periodoTotal, 0, ',', '.') }}</p>
-    </div>
-    <div class="cash-metric" style="--accent:linear-gradient(90deg,#10b981,#34d399)">
-        <p class="cash-metric__label">En billetes</p>
-        <p class="cash-metric__value" style="color:#16a34a">${{ number_format($periodoBills, 0, ',', '.') }}</p>
-    </div>
-    <div class="cash-metric" style="--accent:linear-gradient(90deg,#f59e0b,#f97316)">
-        <p class="cash-metric__label">En monedas</p>
-        <p class="cash-metric__value" style="color:#ea580c">${{ number_format($periodoCoins, 0, ',', '.') }}</p>
-    </div>
-    <div class="cash-metric" style="--accent:linear-gradient(90deg,#0ea5e9,#22c55e)">
-        <p class="cash-metric__label">Registros</p>
-        <p class="cash-metric__value">{{ $periodoCount }}</p>
+    <div class="cash-metric" style="--accent:linear-gradient(90deg,#0f172a,#334155)">
+        <p class="cash-metric__label">Entregas visibles en esta página</p>
+        <p class="cash-metric__value">{{ $deliveries->count() }}</p>
     </div>
 </div>
 @endif
@@ -386,7 +690,7 @@
                     {{ $delivery->deliveredBy?->name ?? '—' }}
                 </td>
                 <td>
-                    <a href="{{ route('cash.show', $delivery) }}"
+                    <a href="{{ route('inventory.cash.show', $delivery) }}"
                        class="cash-view-btn"
                        title="Ver detalle"
                        aria-label="Ver detalle">
@@ -413,7 +717,7 @@
         <p style="font-size:15px;font-weight:500;margin-bottom:var(--space-2)">Sin entregas</p>
         <p style="font-size:13px">No se encontraron entregas en el período seleccionado.</p>
         @can('cash.manage')
-        <a href="{{ route('cash.create') }}" class="btn btn-primary" style="margin-top:var(--space-4);width:auto">Registrar primera entrega</a>
+        <a href="{{ route('inventory.cash.create') }}" class="btn btn-primary" style="margin-top:var(--space-4);width:auto">Registrar primera entrega</a>
         @endcan
     </div>
     @endif

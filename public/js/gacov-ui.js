@@ -343,6 +343,8 @@
     var forms = Array.from(document.querySelectorAll('form[method="get"], form[method="GET"]'));
 
     tables.forEach(function (table) {
+      if (table.hasAttribute('data-server-filter-only')) return;
+
       /* Buscar el formulario más cercano */
       var form = null;
       var panel = table.closest('.panel');
@@ -365,6 +367,7 @@
 
       if (!form && forms.length) form = forms[0];
       if (!form) return;
+      if (form.hasAttribute('data-server-filter-only')) return;
 
       var tbody = table.querySelector('tbody');
       if (!tbody) return;

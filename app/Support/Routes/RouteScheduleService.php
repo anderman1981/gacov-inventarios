@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 final class RouteScheduleService
 {
@@ -66,14 +67,22 @@ final class RouteScheduleService
     {
         $days = $this->weekDays($weekStart);
         $fallbackDrivers = $this->fallbackDriversForRoutes($routes);
-        $assignments = RouteScheduleAssignment::query()
-            ->with(['driver', 'assignedBy'])
-            ->whereBetween('assignment_date', [
-                $days->first()?->toDateString(),
-                $days->last()?->toDateString(),
-            ])
-            ->get()
-            ->groupBy(fn (RouteScheduleAssignment $assignment): string => $assignment->assignment_date->toDateString());
+        $assignments = collect();
+
+        if ($this->scheduleAssignmentsAvailable()) {
+            try {
+                $assignments = RouteScheduleAssignment::query()
+                    ->with(['driver', 'assignedBy'])
+                    ->whereBetween('assignment_date', [
+                        $days->first()?->toDateString(),
+                        $days->last()?->toDateString(),
+                    ])
+                    ->get()
+                    ->groupBy(fn (RouteScheduleAssignment $assignment): string => $assignment->assignment_date->toDateString());
+            } catch (\Throwable) {
+                $assignments = collect();
+            }
+        }
 
         return $days->map(function (Carbon $day) use ($assignments, $routes, $conductors, $fallbackDrivers): array {
             /** @var Collection<int, RouteScheduleAssignment> $dailyAssignments */
@@ -145,10 +154,18 @@ final class RouteScheduleService
      */
     private function assignmentsForDate(CarbonInterface $date): Collection
     {
-        return RouteScheduleAssignment::query()
-            ->whereDate('assignment_date', Carbon::parse($date)->toDateString())
-            ->get()
-            ->keyBy(fn (RouteScheduleAssignment $assignment): int => (int) $assignment->route_id);
+        if (! $this->scheduleAssignmentsAvailable()) {
+            return collect();
+        }
+
+        try {
+            return RouteScheduleAssignment::query()
+                ->whereDate('assignment_date', Carbon::parse($date)->toDateString())
+                ->get()
+                ->keyBy(fn (RouteScheduleAssignment $assignment): int => (int) $assignment->route_id);
+        } catch (\Throwable) {
+            return collect();
+        }
     }
 
     /**
@@ -204,5 +221,14 @@ final class RouteScheduleService
                 ->where('route_id', $route->id)
                 ->whereHas('roles', fn ($query) => $query->where('name', 'conductor'))
                 ->value('id');
+    }
+
+    private function scheduleAssignmentsAvailable(): bool
+    {
+        try {
+            return Schema::hasTable('route_schedule_assignments');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

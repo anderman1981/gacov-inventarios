@@ -89,6 +89,7 @@ final class RolePermissionMatrix
                 'products.edit',
                 'products.delete',
                 'products.import',
+                'machines.view',
                 'inventory.view',
                 'inventory.load_excel',
                 'inventory.load_vehicle_excel',

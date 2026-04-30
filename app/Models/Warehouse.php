@@ -40,6 +40,11 @@ final class Warehouse extends Model
         return $this->belongsTo(Route::class);
     }
 
+    public function machine(): BelongsTo
+    {
+        return $this->belongsTo(Machine::class);
+    }
+
     public function responsible(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsible_user_id');

@@ -488,6 +488,16 @@ final class DriverController extends Controller
 
         $availableRoutes = $this->routeScheduleService->availableRoutesForUser($user, today());
 
+        if ($availableRoutes->isEmpty()) {
+            $fallbackRoute = $this->fallbackDriverRoute($user);
+
+            if ($routeId !== null) {
+                return $fallbackRoute?->id === $routeId ? $fallbackRoute : null;
+            }
+
+            return $fallbackRoute;
+        }
+
         if ($routeId) {
             return $availableRoutes->firstWhere('id', $routeId) ?? $availableRoutes->first();
         }
@@ -520,12 +530,36 @@ final class DriverController extends Controller
                 ->get();
         }
 
-        return $this->routeScheduleService->availableRoutesForUser($user, today());
+        $availableRoutes = $this->routeScheduleService->availableRoutesForUser($user, today());
+
+        if ($availableRoutes->isNotEmpty()) {
+            return $availableRoutes;
+        }
+
+        $fallbackRoute = $this->fallbackDriverRoute($user);
+
+        return $fallbackRoute ? collect([$fallbackRoute]) : collect();
     }
 
     private function canManageAnyRoute(User $user): bool
     {
         return $this->routeScheduleService->canManageAnyRoute($user);
+    }
+
+    private function fallbackDriverRoute(User $user): ?Route
+    {
+        if ($user->route instanceof Route && $user->route->is_active) {
+            return $user->route;
+        }
+
+        return Route::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($user): void {
+                $query->where('driver_user_id', $user->id)
+                    ->orWhere('id', $user->route_id);
+            })
+            ->orderBy('name')
+            ->first();
     }
 
     private function categoryInitials(string $category): string

@@ -24,7 +24,8 @@ final class ProductController extends Controller
         $perPage = $this->resolvePerPage($request, 25);
         $perPageOptions = [10, 25, 50, 100];
 
-        $query = Product::query();
+        $query = Product::query()
+            ->where('code', 'not like', 'CASH-%');
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

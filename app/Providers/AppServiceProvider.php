@@ -15,6 +15,7 @@ use App\Support\Browser\ChromeDevToolsMcpClient;
 use App\Support\Config\AmrConfig;
 use App\Support\Documentation\ChromeDevToolsMcpRepositoryAnalyzer;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 final class AppServiceProvider extends ServiceProvider
@@ -37,5 +38,49 @@ final class AppServiceProvider extends ServiceProvider
     {
         // Registrar observer para sincronizar fases comerciales → técnicas
         Subscription::observe(SubscriptionObserver::class);
+
+        Gate::before(static function ($user, string $ability): ?bool {
+            if (! method_exists($user, 'isSuperAdmin') || ! method_exists($user, 'hasRole')) {
+                return null;
+            }
+
+            if ($user->isSuperAdmin()) {
+                return true;
+            }
+
+            if (! $user->hasRole('admin')) {
+                return null;
+            }
+
+            $adminOperationalAbilities = [
+                'dashboard.full',
+                'products.view',
+                'products.create',
+                'products.edit',
+                'products.delete',
+                'products.import',
+                'inventory.view',
+                'inventory.load_excel',
+                'inventory.load_vehicle_excel',
+                'inventory.load_machine_excel',
+                'inventory.adjust',
+                'machines.view',
+                'movements.view',
+                'transfers.view',
+                'transfers.create',
+                'transfers.approve',
+                'transfers.complete',
+                'drivers.view',
+                'drivers.assign_routes',
+                'cash.manage',
+                'cash.view',
+                'reports.view',
+                'reports.worldoffice',
+                'vehicle.view',
+                'vehicle.inventory.view',
+            ];
+
+            return in_array($ability, $adminOperationalAbilities, true) ? true : null;
+        });
     }
 }

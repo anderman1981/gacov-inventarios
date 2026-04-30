@@ -7,7 +7,26 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-$basePath = dirname(__DIR__, 2).'/gacov_app';
+$baseCandidates = [
+    dirname(__DIR__, 2).'/gacov_app',
+    dirname(__DIR__, 2).'/gacov_app/gacov_app',
+    dirname(__DIR__).'/gacov_app',
+    dirname(__DIR__).'/gacov_app/gacov_app',
+];
+
+$basePath = null;
+
+foreach ($baseCandidates as $candidate) {
+    if (is_file($candidate.'/bootstrap/app.php') && is_file($candidate.'/vendor/autoload.php')) {
+        $basePath = $candidate;
+        break;
+    }
+}
+
+if ($basePath === null) {
+    http_response_code(500);
+    exit('GACOV deploy error: backend path not found.');
+}
 
 if (file_exists($maintenance = $basePath.'/storage/framework/maintenance.php')) {
     require $maintenance;

@@ -15,6 +15,8 @@
         || str_starts_with($routeName, 'inventory.import')
         || str_starts_with($routeName, 'inventory.vehicles')
         || $routeName === 'inventory.machines';
+    $shouldRegisterServiceWorker = app()->environment('production')
+        && in_array(request()->getHost(), ['gacov.webtechnology.com.co', 'gacov.andersonmares.xyz'], true);
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -65,14 +67,14 @@
             </svg>
         </div>
         <div class="pwa-install-text">
-            <strong>Instalar GACOV Inventarios</strong>
-            <span>Accede más rápido desde tu pantalla de inicio</span>
+            <strong id="pwa-install-title">Instalar GACOV Inventarios</strong>
+            <span id="pwa-install-copy">Accede más rápido desde tu pantalla de inicio</span>
         </div>
         <div class="pwa-install-actions">
-            <button id="pwa-install-btn" class="pwa-install-btn">
+            <button id="pwa-install-btn" class="pwa-install-btn" type="button">
                 Instalar
             </button>
-            <button id="pwa-dismiss-btn" class="pwa-dismiss-btn" onclick="document.getElementById('pwa-install-banner').style.display='none'">
+            <button id="pwa-dismiss-btn" class="pwa-dismiss-btn" type="button" onclick="document.getElementById('pwa-install-banner').style.display='none'; try { localStorage.setItem('gacov_pwa_banner_dismissed', String(Date.now())); } catch (e) {}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 6L6 18M6 6l12 12"/>
                 </svg>
@@ -998,31 +1000,84 @@ document.getElementById('sidebarToggle')?.addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════
 let deferredPrompt = null;
 const installBanner = document.getElementById('pwa-install-banner');
+const installBtn = document.getElementById('pwa-install-btn');
+const installCopy = document.getElementById('pwa-install-copy');
+const installTitle = document.getElementById('pwa-install-title');
+
+function isMobileDevice() {
+    return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function isStandaloneMode() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isIosSafari() {
+    const ua = window.navigator.userAgent || '';
+    const isIos = /iPad|iPhone|iPod/.test(ua);
+    const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+
+    return isIos && isSafari;
+}
+
+function wasBannerDismissedRecently() {
+    try {
+        const raw = localStorage.getItem('gacov_pwa_banner_dismissed');
+        if (!raw) {
+            return false;
+        }
+
+        const dismissedAt = Number(raw);
+
+        return Number.isFinite(dismissedAt) && (Date.now() - dismissedAt) < (1000 * 60 * 60 * 24 * 7);
+    } catch (e) {
+        return false;
+    }
+}
+
+function showInstallBanner(mode = 'installable') {
+    if (!installBanner || !isMobileDevice() || isStandaloneMode() || wasBannerDismissedRecently()) {
+        return;
+    }
+
+    if (mode === 'ios-manual') {
+        if (installTitle) installTitle.textContent = 'Instala GACOV en tu iPhone';
+        if (installCopy) installCopy.textContent = 'Toca Compartir y luego “Agregar a pantalla de inicio”.';
+        if (installBtn) {
+            installBtn.textContent = 'Entendido';
+            installBtn.onclick = function () {
+                installBanner.style.display = 'none';
+                try { localStorage.setItem('gacov_pwa_banner_dismissed', String(Date.now())); } catch (e) {}
+            };
+        }
+    } else {
+        if (installTitle) installTitle.textContent = 'Instalar GACOV Inventarios';
+        if (installCopy) installCopy.textContent = 'Accede más rápido desde tu pantalla de inicio.';
+        if (installBtn) {
+            installBtn.textContent = 'Instalar';
+            installBtn.onclick = async function () {
+                if (!deferredPrompt) return;
+
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+
+                if (outcome === 'accepted') {
+                    installBanner.style.display = 'none';
+                }
+
+                deferredPrompt = null;
+            };
+        }
+    }
+
+    installBanner.style.display = 'flex';
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
-    // Mostrar banner de instalación si existe
-    if (installBanner) {
-        installBanner.style.display = 'flex';
-    }
-    
-    // Agregar listener al botón de instalar
-    const installBtn = document.getElementById('pwa-install-btn');
-    if (installBtn) {
-        installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                installBanner.style.display = 'none';
-            }
-            deferredPrompt = null;
-        });
-    }
+
+    showInstallBanner('installable');
 });
 
 window.addEventListener('appinstalled', () => {
@@ -1034,7 +1089,7 @@ window.addEventListener('appinstalled', () => {
 });
 
 // Registrar Service Worker solo en producción real.
-const shouldRegisterServiceWorker = @json(app()->environment('production') && request()->getHost() === 'gacov.webtechnology.com.co');
+const shouldRegisterServiceWorker = @json($shouldRegisterServiceWorker);
 const serviceWorkerCachePrefix = 'gacov-';
 
 async function clearServiceWorkerState() {
@@ -1053,6 +1108,10 @@ async function clearServiceWorkerState() {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
+        if (isIosSafari() && !isStandaloneMode()) {
+            window.setTimeout(() => showInstallBanner('ios-manual'), 1200);
+        }
+
         if (!shouldRegisterServiceWorker) {
             try {
                 await clearServiceWorkerState();

@@ -55,11 +55,11 @@
         <div class="badge badge-neutral">Resultados en esta vista: {{ number_format($products->total(), 0, ',', '.') }}</div>
     </div>
     <div class="inventory-filter-card__body">
-        <form method="GET" action="{{ route('products.index') }}" class="inventory-filter-form">
+        <form method="GET" action="{{ route('products.index') }}" class="inventory-filter-form" data-server-filter-only>
             <input type="hidden" name="status" value="{{ $selectedTab }}">
             <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
                 <label class="form-label">Buscar</label>
-                <input type="text" name="search" class="form-input" placeholder="ID, código, WorldOffice o nombre..." value="{{ request('search') }}">
+                <input type="text" name="search" class="form-input" placeholder="ID, código, WorldOffice o nombre..." value="{{ request('search') }}" oninput="clearTimeout(window.__productsIndexSearchTimer); window.__productsIndexSearchTimer = setTimeout(() => this.form.submit(), 350)">
             </div>
             <div class="form-group" style="min-width:180px;margin-bottom:0">
                 <label class="form-label">Categoría</label>
@@ -94,7 +94,7 @@
 
     @if($products->count() > 0)
     <div class="table-scroll">
-    <table class="data-table">
+    <table class="data-table" data-server-filter-only>
         <thead>
             <tr>
                 <th class="col-id">ID</th>
