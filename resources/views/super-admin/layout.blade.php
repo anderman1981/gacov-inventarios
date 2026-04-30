@@ -23,10 +23,7 @@
     
     <title>@yield('title', 'Panel Maestro') — AMR Tech</title>
     @php($routeName = request()->route()?->getName() ?? '')
-    @php($hasViteAssets = file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
-    @if($hasViteAssets)
-    @vite(['frontend/resources/css/app.css', 'frontend/resources/js/app.js'])
-    @endif
+    @include('layouts.partials.vite-assets')
     @livewireStyles
     @stack('styles')
     <style>

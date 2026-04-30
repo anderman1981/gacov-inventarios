@@ -8,10 +8,7 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#D71920">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    @php($hasViteAssets = file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
-    @if($hasViteAssets)
-    @vite(['frontend/resources/css/app.css', 'frontend/resources/js/app.js'])
-    @endif
+    @include('layouts.partials.vite-assets')
 </head>
 <body>
     <div class="auth-wrapper">
