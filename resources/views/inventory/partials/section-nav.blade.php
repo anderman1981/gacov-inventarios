@@ -29,6 +29,18 @@
         </span>
     </a>
 
+    @can('inventory.load_excel')
+    <a href="{{ route('inventory.purchases.index') }}" class="inventory-section-nav__item {{ str_starts_with($inventoryRoute, 'inventory.purchases') ? 'active' : '' }}" title="Compras CSV · Tabla temporal" aria-label="Compras CSV">
+        <span class="inventory-section-nav__icon">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-1h-2v1H5V5h10v1h2V5a2 2 0 00-2-2H5z"/><path d="M12 7a1 1 0 011-1h3a1 1 0 011 1v3h-2V8h-2V7zm-2 5a1 1 0 011-1h6v2h-6a1 1 0 01-1-1zm6 2h2v2a1 1 0 01-1 1h-4a1 1 0 110-2h3v-1z"/></svg>
+        </span>
+        <span class="inventory-section-nav__text">
+            <span class="inventory-section-nav__label">Compras CSV</span>
+            <span class="inventory-section-nav__copy">Tabla temporal</span>
+        </span>
+    </a>
+    @endcan
+
     <a href="{{ route('inventory.vehicles') }}" class="inventory-section-nav__item {{ $inventoryRoute === 'inventory.vehicles' || str_starts_with($inventoryRoute, 'inventory.vehicles.import') ? 'active' : '' }}" title="Vehículos · Rutas y carros" aria-label="Vehículos">
         <span class="inventory-section-nav__icon">
             <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 11a1 1 0 011-1h9l2.447-2.04A1 1 0 0117 8.728V14a2 2 0 01-2 2h-.382a2.5 2.5 0 01-4.236 0H8.618a2.5 2.5 0 01-4.236 0H4a2 2 0 01-2-2v-3z"/></svg>

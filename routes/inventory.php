@@ -3,6 +3,7 @@
 declare(strict_types=1);
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\DriverCashController;
+use App\Http\Controllers\PurchaseImportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->group(function () {
@@ -25,6 +26,12 @@ Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->
         Route::get('/import', [InventoryController::class, 'importForm'])->name('import.form');
         Route::get('/import/template', [InventoryController::class, 'downloadImportTemplate'])->name('import.template');
         Route::post('/import', [InventoryController::class, 'storeImport'])->name('import.store');
+        Route::get('/purchases', [PurchaseImportController::class, 'index'])->name('purchases.index');
+        Route::get('/purchases/template', [PurchaseImportController::class, 'template'])->name('purchases.template');
+        Route::post('/purchases', [PurchaseImportController::class, 'store'])->name('purchases.store');
+        Route::get('/purchases/{purchaseImport}', [PurchaseImportController::class, 'show'])->name('purchases.show');
+        Route::post('/purchases/{purchaseImport}/confirm', [PurchaseImportController::class, 'confirm'])->name('purchases.confirm');
+        Route::delete('/purchases/{purchaseImport}', [PurchaseImportController::class, 'destroy'])->name('purchases.destroy');
         Route::get('/adjust', [InventoryController::class, 'adjust'])->name('adjust');
         Route::post('/adjust', [InventoryController::class, 'storeAdjust'])->name('adjust.store');
     });

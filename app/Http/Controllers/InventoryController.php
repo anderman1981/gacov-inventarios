@@ -231,6 +231,7 @@ final class InventoryController extends Controller
             'venta_maquina' => 'Venta máquina',
             'conteo_fisico' => 'Conteo físico',
             'exportado_wo' => 'Exportado WO',
+            'compra' => 'Compra',
         ];
 
         return view('inventory.movements', compact('movements', 'movementTypes', 'perPage', 'perPageOptions'));
