@@ -159,12 +159,14 @@ final readonly class GetDashboardOverview
      */
     private function buildSalesByLocation(): array
     {
+        $locationLabelSql = "COALESCE(NULLIF(machines.location, ''), 'Sin ubicación')";
+
         return MachineSaleItem::query()
             ->join('machine_sales', 'machine_sales.id', '=', 'machine_sale_items.machine_sale_id')
             ->join('machines', 'machines.id', '=', 'machine_sales.machine_id')
             ->whereBetween('machine_sales.sale_date', [now()->subDays(29)->toDateString(), now()->toDateString()])
-            ->selectRaw("COALESCE(NULLIF(machines.location, ''), 'Sin ubicación') as location_label, SUM(machine_sale_items.quantity_sold) as units, SUM(machine_sale_items.quantity_sold * machine_sale_items.unit_price) as revenue")
-            ->groupByRaw("COALESCE(NULLIF(machines.location, ''), 'Sin ubicación')")
+            ->selectRaw("{$locationLabelSql} as location_label, SUM(machine_sale_items.quantity_sold) as units, SUM(machine_sale_items.quantity_sold * machine_sale_items.unit_price) as revenue")
+            ->groupBy('location_label')
             ->orderByDesc('revenue')
             ->limit(5)
             ->get()
