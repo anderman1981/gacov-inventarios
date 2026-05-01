@@ -34,6 +34,8 @@
     <meta name="apple-mobile-web-app-title" content="GACOV">
     
     {{-- Icons --}}
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="shortcut icon" href="/favicon.ico">
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
