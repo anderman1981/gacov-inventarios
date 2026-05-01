@@ -13,6 +13,10 @@ use RuntimeException;
 
 final class UpdatePurchaseImportRowHandler
 {
+    public function __construct(
+        private readonly EnsureMissingPurchaseProductHandler $ensureMissingPurchaseProductHandler,
+    ) {}
+
     /**
      * @param array{
      *     product_code:string,
@@ -21,7 +25,9 @@ final class UpdatePurchaseImportRowHandler
      *     supplier?:string|null,
      *     invoice_number?:string|null,
      *     purchase_date?:string|null,
-     *     notes?:string|null
+     *     notes?:string|null,
+     *     create_missing_product?:bool|int|string|null,
+     *     create_product_name?:string|null
      * } $data
      */
     public function handle(PurchaseImportBatch $batch, PurchaseImportRow $row, array $data): PurchaseImportBatch
@@ -51,26 +57,44 @@ final class UpdatePurchaseImportRowHandler
                 ->firstOrFail();
 
             $productCode = trim((string) $data['product_code']);
+            $quantity = (int) $data['quantity'];
+            $unitCost = $this->toFloat($data['unit_cost'] ?? 0);
+            $supplier = $this->cleanNullableString($data['supplier'] ?? null);
+            $invoiceNumber = $this->cleanNullableString($data['invoice_number'] ?? null);
+            $purchaseDate = $this->parseDate($data['purchase_date'] ?? null);
+            $notes = $this->cleanNullableString($data['notes'] ?? null);
+            $createProductName = $this->cleanNullableString($data['create_product_name'] ?? null);
+            $createMissingProduct = $this->toBoolean($data['create_missing_product'] ?? false);
+
             $product = $this->resolveProduct($productCode);
             $errors = [];
+
+            if (! $product instanceof Product && $createMissingProduct) {
+                $product = $this->ensureMissingPurchaseProductHandler->handle(
+                    batch: $lockedBatch,
+                    row: $lockedRow,
+                    productCode: $productCode,
+                    productName: $createProductName,
+                    unitCost: $unitCost,
+                    supplier: $supplier,
+                    purchaseDate: $purchaseDate,
+                );
+            }
 
             if (! $product instanceof Product) {
                 $errors[] = "Producto no encontrado para {$productCode}.";
             }
 
-            $quantity = (int) $data['quantity'];
-            $unitCost = $this->toFloat($data['unit_cost'] ?? 0);
-
             $lockedRow->update([
                 'product_id' => $product?->id,
                 'product_code' => $productCode,
-                'product_name' => $product?->name ?? $lockedRow->product_name,
+                'product_name' => $product?->name ?? $createProductName ?? $lockedRow->product_name,
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
-                'supplier' => $this->cleanNullableString($data['supplier'] ?? null),
-                'invoice_number' => $this->cleanNullableString($data['invoice_number'] ?? null),
-                'purchase_date' => $this->parseDate($data['purchase_date'] ?? null),
-                'notes' => $this->cleanNullableString($data['notes'] ?? null),
+                'supplier' => $supplier,
+                'invoice_number' => $invoiceNumber,
+                'purchase_date' => $purchaseDate,
+                'notes' => $notes,
                 'status' => $errors === [] ? 'valida' : 'error',
                 'error_message' => $errors !== [] ? implode(' ', $errors) : null,
             ]);
@@ -132,5 +156,10 @@ final class UpdatePurchaseImportRowHandler
         $cleaned = $this->cleanNullableString($value);
 
         return $cleaned !== null ? Carbon::parse($cleaned)->startOfDay() : null;
+    }
+
+    private function toBoolean(mixed $value): bool
+    {
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 }

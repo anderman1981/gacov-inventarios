@@ -3,7 +3,9 @@
 declare(strict_types=1);
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\DriverCashController;
+use App\Http\Controllers\PurchaseImportBatchActionsController;
 use App\Http\Controllers\PurchaseImportController;
+use App\Http\Controllers\PurchaseImportReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->group(function () {
@@ -30,7 +32,10 @@ Route::middleware(['auth', 'tenant'])->prefix('inventory')->name('inventory.')->
         Route::get('/purchases/template', [PurchaseImportController::class, 'template'])->name('purchases.template');
         Route::post('/purchases', [PurchaseImportController::class, 'store'])->name('purchases.store');
         Route::patch('/purchases/{purchaseImport}/rows/{row}', [PurchaseImportController::class, 'updateRow'])->name('purchases.rows.update');
-        Route::get('/purchases/{purchaseImport}', [PurchaseImportController::class, 'show'])->name('purchases.show');
+        Route::post('/purchases/{purchaseImport}/notify', [PurchaseImportBatchActionsController::class, 'notify'])->name('purchases.notify');
+        Route::post('/purchases/{purchaseImport}/verify', [PurchaseImportBatchActionsController::class, 'verify'])->name('purchases.verify');
+        Route::post('/purchases/{purchaseImport}/validate', [PurchaseImportBatchActionsController::class, 'validateBatch'])->name('purchases.validate');
+        Route::get('/purchases/{purchaseImport}', [PurchaseImportReviewController::class, 'show'])->name('purchases.show');
         Route::post('/purchases/{purchaseImport}/confirm', [PurchaseImportController::class, 'confirm'])->name('purchases.confirm');
         Route::delete('/purchases/{purchaseImport}', [PurchaseImportController::class, 'destroy'])->name('purchases.destroy');
         Route::get('/adjust', [InventoryController::class, 'adjust'])->name('adjust');

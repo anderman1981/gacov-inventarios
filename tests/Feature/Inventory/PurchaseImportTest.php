@@ -121,7 +121,7 @@ final class PurchaseImportTest extends TestCase
         $this->actingAs($user)
             ->get(route('inventory.purchases.show', $batch))
             ->assertOk()
-            ->assertSee('Productos sin match');
+            ->assertSee('Correcciones pendientes');
 
         $this->actingAs($user)
             ->patch(route('inventory.purchases.rows.update', [$batch, $row]), [
@@ -158,6 +158,106 @@ final class PurchaseImportTest extends TestCase
             'product_id' => $product->id,
             'quantity' => 8,
         ]);
+    }
+
+    public function test_unmatched_row_can_create_missing_product_during_update(): void
+    {
+        Storage::fake('local');
+
+        [$user, $warehouse] = $this->seedPurchaseContext();
+        $file = UploadedFile::fake()->createWithContent(
+            'compras-crear-producto.csv',
+            "codigo_producto;cantidad;costo_unitario;proveedor;factura;fecha_compra;observaciones\n"
+            ."NUEVO-001;5;2800;Proveedor Nuevo;FC-009;2026-04-30;Producto nuevo\n"
+        );
+
+        $this->actingAs($user)->post(route('inventory.purchases.store'), [
+            'purchase_file' => $file,
+        ]);
+
+        $batch = PurchaseImportBatch::query()->firstOrFail();
+        $row = $batch->rows()->firstOrFail();
+
+        $this->actingAs($user)
+            ->patch(route('inventory.purchases.rows.update', [$batch, $row]), [
+                'product_code' => 'NUEVO-001',
+                'quantity' => 5,
+                'unit_cost' => 2800,
+                'supplier' => 'Proveedor Nuevo',
+                'invoice_number' => 'FC-009',
+                'purchase_date' => '2026-04-30',
+                'notes' => 'Crear desde compra',
+                'create_missing_product' => true,
+                'create_product_name' => 'Maizitos Carga',
+            ])
+            ->assertRedirect(route('inventory.purchases.show', $batch));
+
+        $createdProduct = Product::query()->where('code', 'NUEVO-001')->first();
+        $this->assertNotNull($createdProduct);
+
+        $this->assertDatabaseHas('purchase_import_rows', [
+            'id' => $row->id,
+            'product_id' => $createdProduct?->id,
+            'status' => 'valida',
+            'error_message' => null,
+        ]);
+        $this->assertDatabaseHas('purchase_import_batches', [
+            'id' => $batch->id,
+            'valid_rows' => 1,
+            'error_rows' => 0,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('inventory.purchases.confirm', $batch))
+            ->assertRedirect(route('inventory.purchases.show', $batch));
+
+        $this->assertDatabaseHas('stock', [
+            'warehouse_id' => $warehouse->id,
+            'product_id' => $createdProduct?->id,
+            'quantity' => 5,
+        ]);
+    }
+
+    public function test_purchase_batch_can_be_revalidated_after_catalog_changes(): void
+    {
+        Storage::fake('local');
+
+        [$user] = $this->seedPurchaseContext();
+        $file = UploadedFile::fake()->createWithContent(
+            'compras-revalidate.csv',
+            "codigo_producto;cantidad;costo_unitario\n"
+            ."REVAL-001;9;2100\n"
+        );
+
+        $this->actingAs($user)->post(route('inventory.purchases.store'), [
+            'purchase_file' => $file,
+        ]);
+
+        $batch = PurchaseImportBatch::query()->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('inventory.purchases.verify', $batch))
+            ->assertRedirect(route('inventory.purchases.show', $batch));
+
+        $this->assertSame(1, $batch->fresh()->error_rows);
+
+        Product::factory()->create([
+            'tenant_id' => $user->tenant_id,
+            'code' => 'REVAL-001',
+            'name' => 'Producto Revalidado',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('inventory.purchases.verify', $batch))
+            ->assertRedirect(route('inventory.purchases.show', $batch));
+
+        $this->assertSame(0, $batch->fresh()->error_rows);
+        $this->assertSame(1, $batch->fresh()->valid_rows);
+
+        $this->actingAs($user)
+            ->post(route('inventory.purchases.validate', $batch))
+            ->assertRedirect(route('inventory.purchases.show', $batch));
     }
 
     /**

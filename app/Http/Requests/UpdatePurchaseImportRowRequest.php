@@ -26,6 +26,8 @@ final class UpdatePurchaseImportRowRequest extends FormRequest
             'invoice_number' => ['nullable', 'string', 'max:80'],
             'purchase_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'create_missing_product' => ['nullable', 'boolean'],
+            'create_product_name' => ['nullable', 'string', 'max:150'],
         ];
     }
 }

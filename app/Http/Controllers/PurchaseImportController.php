@@ -9,7 +9,6 @@ use App\Application\UseCase\Inventory\StagePurchaseCsvImportHandler;
 use App\Application\UseCase\Inventory\UpdatePurchaseImportRowHandler;
 use App\Http\Requests\StagePurchaseImportRequest;
 use App\Http\Requests\UpdatePurchaseImportRowRequest;
-use App\Models\Product;
 use App\Models\PurchaseImportBatch;
 use App\Models\PurchaseImportRow;
 use App\Models\Warehouse;
@@ -99,33 +98,6 @@ final class PurchaseImportController extends Controller
         return redirect()
             ->route('inventory.purchases.show', $batch)
             ->with((int) $batch->error_rows > 0 ? 'error' : 'success', $message);
-    }
-
-    public function show(PurchaseImportBatch $purchaseImport): View
-    {
-        $this->authorizePurchaseImports();
-
-        $purchaseImport->load(['warehouse', 'uploader', 'processor', 'discarder']);
-        $unmatchedRows = $purchaseImport->rows()
-            ->where('status', 'error')
-            ->orderBy('row_number')
-            ->get();
-        $productOptions = Product::query()
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->limit(500)
-            ->get(['code', 'worldoffice_code', 'supplier_sku', 'name']);
-        $rows = $purchaseImport->rows()
-            ->with('product')
-            ->orderBy('row_number')
-            ->paginate(100);
-
-        return view('inventory.purchases.show', [
-            'batch' => $purchaseImport,
-            'unmatchedRows' => $unmatchedRows,
-            'productOptions' => $productOptions,
-            'rows' => $rows,
-        ]);
     }
 
     public function updateRow(
