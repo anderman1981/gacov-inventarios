@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Iniciar Sesión') — Inversiones GACOV S.A.S.</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20260501">
+    <link rel="shortcut icon" href="/favicon.ico?v=20260501">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#D71920">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
